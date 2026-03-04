@@ -1,13 +1,31 @@
 import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
-import type { AvatarPickRequest, RealtimeSessionRequest } from '@neurofang/shared';
+import type {
+  AvatarPickRequest,
+  InterviewDifficulty,
+  InterviewPersonality,
+  RealtimeSessionRequest
+} from '@neurofang/shared';
 import { avatarCatalog } from './avatarCatalog.js';
 import { pickAvatar } from './avatarPicker.js';
 import { loadRecentAvatars } from './recentAvatarStore.js';
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 8787);
+
+const allowedDifficulties: InterviewDifficulty[] = ['friendly', 'neutral', 'tough'];
+const allowedPersonalities: InterviewPersonality[] = ['friendly', 'analytical', 'skeptical', 'executive'];
+
+function normalizeDifficulty(value: unknown): InterviewDifficulty {
+  return allowedDifficulties.includes(value as InterviewDifficulty) ? (value as InterviewDifficulty) : 'neutral';
+}
+
+function normalizePersonality(value: unknown): InterviewPersonality {
+  return allowedPersonalities.includes(value as InterviewPersonality)
+    ? (value as InterviewPersonality)
+    : 'friendly';
+}
 
 loadRecentAvatars();
 
@@ -40,6 +58,11 @@ app.post('/session', async (req, res) => {
     return;
   }
 
+  const selectedAvatar = avatarCatalog.find((avatar) => avatar.id === body.avatarId);
+  const intake = body.intake;
+  const difficultyLabel = normalizeDifficulty(intake?.difficulty);
+  const personalityLabel = normalizePersonality(intake?.personality);
+
   const form = new FormData();
   form.append('sdp', body.sdp);
   form.append(
@@ -48,7 +71,15 @@ app.post('/session', async (req, res) => {
       type: 'realtime',
       model: process.env.OPENAI_REALTIME_MODEL ?? 'gpt-4o-realtime-preview',
       voice: process.env.OPENAI_REALTIME_VOICE ?? 'alloy',
-      instructions: `You are a mock technical interviewer. Intake: ${JSON.stringify(body.intake ?? {})}`
+      instructions: [
+        'You are Neurofang, a business-professional mock interviewer for technical interviews.',
+        `Use a ${difficultyLabel} interview difficulty and a ${personalityLabel} interviewer personality.`,
+        'Stay respectful, concise, and realistic. Ask one question at a time and wait for the answer.',
+        selectedAvatar
+          ? `Interviewer profile: ${selectedAvatar.name}, ${selectedAvatar.gender}, ${selectedAvatar.raceGroup}.`
+          : 'Interviewer profile: use a neutral professional tone.',
+        `Intake: ${JSON.stringify(intake ?? {})}`
+      ].join(' ')
     })
   );
 
