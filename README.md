@@ -4,9 +4,9 @@ TypeScript monorepo MVP for voice-to-voice interview simulation with OpenAI Real
 
 ## Workspace layout
 
-- `apps/server` – Express API: session proxy + avatar APIs.
+- `apps/server` – Express API: session relay + avatar APIs.
 - `apps/web` – Next.js interview UI + 3D interviewer.
-- `apps/mobile` – Expo dev client + `react-native-webrtc` interview screen.
+- `apps/mobile` – Expo dev client + `react-native-webrtc` interview flow.
 - `packages/shared` – shared types used by apps.
 
 ## Prerequisites
@@ -23,31 +23,35 @@ npm install
 
 ## Environment variables
 
-Create `apps/server/.env`:
+Copy and edit env templates:
+
+```bash
+cp apps/server/.env.example apps/server/.env
+cp apps/web/.env.local.example apps/web/.env.local
+cp apps/mobile/.env.example apps/mobile/.env
+```
+
+`apps/server/.env`:
 
 ```bash
 OPENAI_API_KEY=sk-...
 OPENAI_REALTIME_MODEL=gpt-4o-realtime-preview
 OPENAI_REALTIME_VOICE=alloy
 PORT=8787
-
-# Optional modules (off by default)
 AZURE_SPEECH_KEY=
 AZURE_SPEECH_REGION=
 ENABLE_MEDIAPIPE_METRICS=false
 ```
 
-For web client override server URL (optional):
+`apps/web/.env.local` (optional override):
 
 ```bash
-# apps/web/.env.local
 NEXT_PUBLIC_SERVER_URL=http://localhost:8787
 ```
 
-For mobile (LAN IP needed):
+`apps/mobile/.env` (required for LAN device testing):
 
 ```bash
-# apps/mobile/.env
 EXPO_PUBLIC_SERVER_URL=http://192.168.1.X:8787
 ```
 
@@ -61,21 +65,37 @@ This starts:
 - server on `http://localhost:8787`
 - web on `http://localhost:3000`
 
+## Run mobile dev client
+
+```bash
+npm run dev:mobile
+npm run android -w @neurofang/mobile
+# or
+npm run ios -w @neurofang/mobile
+```
+
 ## OpenAI Realtime Unified Interface flow
 
 1. Client creates WebRTC offer SDP.
 2. Client `POST`s `{ sdp, intake, avatarId }` to `apps/server /session`.
 3. Server forwards to `https://api.openai.com/v1/realtime/calls` with multipart form data:
    - `sdp` (offer)
-   - `session` (json config)
+   - `session` (json config + business-professional interviewer instructions)
 4. Server returns answer SDP as `{ answerSdp }`.
 5. Client sets remote description and starts bidirectional audio.
+
+## Interview model controls
+
+- Difficulty options: `friendly` / `neutral` / `tough`
+- Personality options: `friendly` / `analytical` / `skeptical` / `executive`
+- The web and mobile clients send these values in `intake`; server injects them into OpenAI instructions.
 
 ## Avatar catalog and diversity-aware picker
 
 - Starter catalog includes 16 entries (`8 male`, `8 female`) across diverse race groups.
 - `/api/avatars` returns all catalog entries.
 - `/api/avatars/pick` selects an avatar while de-prioritizing recently used IDs and over-represented race groups from recent picks.
+- Web and mobile default to “Pick for me” using `/api/avatars/pick`.
 - Recent IDs are persisted in `apps/server/data/recent-avatars.json` (created at runtime).
 
 ## Ready Player Me assets (no copyrighted files committed)
@@ -96,22 +116,6 @@ Add your own RPM assets:
 - listening nods
 - audio-driven lip sync from remote stream analyzer
 - jaw-bone rotation fallback when ARKit blendshape is missing
-
-## Mobile app (Expo dev client)
-
-Start Metro for dev client:
-
-```bash
-npm run dev:mobile
-```
-
-Build dev client (example Android):
-
-```bash
-npm run android -w @neurofang/mobile
-```
-
-The mobile MVP includes connect/disconnect and WebRTC audio session negotiation. It includes a placeholder for 3D avatar rendering; add `expo-three` and native R3F setup later if needed.
 
 ## Optional modules scaffold
 

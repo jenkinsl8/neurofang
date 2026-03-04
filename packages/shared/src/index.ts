@@ -1,6 +1,6 @@
 export type InterviewLevel = 'junior' | 'mid' | 'senior' | 'staff';
-export type InterviewDifficulty = 'easy' | 'medium' | 'hard';
-export type InterviewPersonality = 'friendly' | 'neutral' | 'challenging';
+export type InterviewDifficulty = 'friendly' | 'neutral' | 'tough';
+export type InterviewPersonality = 'friendly' | 'analytical' | 'skeptical' | 'executive';
 
 export type InterviewIntake = {
   company: string;

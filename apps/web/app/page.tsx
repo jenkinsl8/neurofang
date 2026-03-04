@@ -10,98 +10,138 @@ const defaultIntake: InterviewIntake = {
   company: 'Acme',
   jobTitle: 'Frontend Engineer',
   level: 'mid',
-  difficulty: 'medium',
+  difficulty: 'neutral',
   personality: 'friendly'
 };
 
 export default function Page() {
   const [intake, setIntake] = useState<InterviewIntake>(defaultIntake);
   const [avatars, setAvatars] = useState<AvatarCatalogEntry[]>([]);
-  const [avatarId, setAvatarId] = useState<string>('');
+  const [avatarId, setAvatarId] = useState<string>('pick-for-me');
   const [status, setStatus] = useState('idle');
+  const [error, setError] = useState<string>('');
   const peerRef = useRef<RTCPeerConnection | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
-  const selectedAvatar = useMemo(() => avatars.find((avatar) => avatar.id === avatarId), [avatars, avatarId]);
+  const selectedAvatar = useMemo(
+    () => avatars.find((avatar) => avatar.id === avatarId) ?? avatars[0],
+    [avatars, avatarId]
+  );
+
+  async function pickRandomAvatar(currentId = avatarId) {
+    const res = await fetch(`${SERVER_URL}/api/avatars/pick`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ excludeIds: currentId === 'pick-for-me' ? [] : [currentId] })
+    });
+
+    if (!res.ok) {
+      throw new Error(`Avatar pick failed: ${res.status}`);
+    }
+
+    const data = (await res.json()) as { avatar: AvatarCatalogEntry };
+    setAvatarId(data.avatar.id);
+  }
 
   useEffect(() => {
-    fetch(`${SERVER_URL}/api/avatars`)
-      .then((res) => res.json())
-      .then((data) => {
+    void (async () => {
+      try {
+        setError('');
+        const avatarsResponse = await fetch(`${SERVER_URL}/api/avatars`);
+        if (!avatarsResponse.ok) {
+          throw new Error(`Failed to load avatars: ${avatarsResponse.status}`);
+        }
+
+        const data = (await avatarsResponse.json()) as { avatars: AvatarCatalogEntry[] };
         setAvatars(data.avatars);
-        if (data.avatars[0]) setAvatarId(data.avatars[0].id);
-      });
+        await pickRandomAvatar('pick-for-me');
+      } catch (nextError) {
+        setError(nextError instanceof Error ? nextError.message : 'Failed to initialize page');
+      }
+    })();
   }, []);
 
   async function connect() {
-    const peer = new RTCPeerConnection();
-    peerRef.current = peer;
-    setStatus('connecting');
+    try {
+      setError('');
+      const peer = new RTCPeerConnection();
+      peerRef.current = peer;
+      setStatus('connecting');
 
-    const userStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    userStream.getTracks().forEach((track) => peer.addTrack(track, userStream));
+      const userStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      localStreamRef.current = userStream;
+      userStream.getTracks().forEach((track) => peer.addTrack(track, userStream));
 
-    const remote = new MediaStream();
-    peer.ontrack = (event) => {
-      event.streams[0].getTracks().forEach((track) => remote.addTrack(track));
-      setRemoteStream(new MediaStream(remote.getTracks()));
-    };
+      const remote = new MediaStream();
+      peer.ontrack = (event) => {
+        event.streams[0].getTracks().forEach((track) => remote.addTrack(track));
+        setRemoteStream(new MediaStream(remote.getTracks()));
+      };
 
-    const audio = document.getElementById('remote-audio') as HTMLAudioElement;
-    if (audio) {
-      audio.srcObject = remote;
-      void audio.play();
+      const audio = document.getElementById('remote-audio') as HTMLAudioElement;
+      if (audio) {
+        audio.srcObject = remote;
+        void audio.play();
+      }
+
+      const offer = await peer.createOffer();
+      await peer.setLocalDescription(offer);
+
+      const sessionRes = await fetch(`${SERVER_URL}/session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sdp: offer.sdp, intake, avatarId: selectedAvatar?.id })
+      });
+
+      if (!sessionRes.ok) {
+        const payload = (await sessionRes.json().catch(() => ({ error: 'Unknown server error' }))) as {
+          error?: string;
+        };
+        throw new Error(payload.error ?? `Session setup failed: ${sessionRes.status}`);
+      }
+
+      const { answerSdp } = (await sessionRes.json()) as { answerSdp: string };
+      await peer.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+      setStatus('connected');
+    } catch (nextError) {
+      disconnect();
+      setError(nextError instanceof Error ? nextError.message : 'Failed to connect');
     }
-
-    const offer = await peer.createOffer();
-    await peer.setLocalDescription(offer);
-
-    const sessionRes = await fetch(`${SERVER_URL}/session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sdp: offer.sdp, intake, avatarId })
-    });
-
-    const { answerSdp } = await sessionRes.json();
-    await peer.setRemoteDescription({ type: 'answer', sdp: answerSdp });
-    setStatus('connected');
   }
 
   function disconnect() {
+    localStreamRef.current?.getTracks().forEach((track) => track.stop());
+    localStreamRef.current = null;
     peerRef.current?.close();
     peerRef.current = null;
     setRemoteStream(null);
     setStatus('idle');
   }
 
-  async function pickRandomAvatar() {
-    const res = await fetch(`${SERVER_URL}/api/avatars/pick`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ excludeIds: [avatarId] })
-    });
-    const data = await res.json();
-    setAvatarId(data.avatar.id);
-  }
-
   return (
     <main>
       <h1>Neurofang MVP</h1>
       <audio id="remote-audio" autoPlay playsInline />
+      {error ? <p style={{ color: '#fca5a5' }}>{error}</p> : null}
       <div className="card">
         <h3>Interview intake</h3>
         <div className="grid">
           <label>Company<input value={intake.company} onChange={(e) => setIntake({ ...intake, company: e.target.value })} /></label>
           <label>Job title<input value={intake.jobTitle} onChange={(e) => setIntake({ ...intake, jobTitle: e.target.value })} /></label>
           <label>Level<select value={intake.level} onChange={(e) => setIntake({ ...intake, level: e.target.value as InterviewIntake['level'] })}><option>junior</option><option>mid</option><option>senior</option><option>staff</option></select></label>
-          <label>Difficulty<select value={intake.difficulty} onChange={(e) => setIntake({ ...intake, difficulty: e.target.value as InterviewIntake['difficulty'] })}><option>easy</option><option>medium</option><option>hard</option></select></label>
-          <label>Personality<select value={intake.personality} onChange={(e) => setIntake({ ...intake, personality: e.target.value as InterviewIntake['personality'] })}><option>friendly</option><option>neutral</option><option>challenging</option></select></label>
+          <label>Difficulty<select value={intake.difficulty} onChange={(e) => setIntake({ ...intake, difficulty: e.target.value as InterviewIntake['difficulty'] })}><option>friendly</option><option>neutral</option><option>tough</option></select></label>
+          <label>Personality<select value={intake.personality} onChange={(e) => setIntake({ ...intake, personality: e.target.value as InterviewIntake['personality'] })}><option>friendly</option><option>analytical</option><option>skeptical</option><option>executive</option></select></label>
         </div>
       </div>
 
       <div className="card">
         <h3>Avatar picker</h3>
         <div className="avatar-grid">
+          <button className="avatar-tile" onClick={() => void pickRandomAvatar()}>
+            <strong>Pick for me</strong>
+            <div>Diversity-aware default selection</div>
+          </button>
           {avatars.map((avatar) => (
             <button key={avatar.id} className="avatar-tile" onClick={() => setAvatarId(avatar.id)} style={{ outline: avatarId === avatar.id ? '2px solid #60a5fa' : 'none' }}>
               <strong>{avatar.name}</strong>
@@ -109,16 +149,17 @@ export default function Page() {
             </button>
           ))}
         </div>
-        <div style={{ marginTop: 10 }}><button onClick={pickRandomAvatar}>Pick random diverse avatar</button></div>
+        <div style={{ marginTop: 10 }}><button onClick={() => void pickRandomAvatar()}>Pick random diverse avatar</button></div>
       </div>
 
       <div className="card stage">
         <div>
           <h3>Interview stage</h3>
           <p>Status: {status}</p>
-          <button onClick={connect} disabled={status === 'connecting' || status === 'connected'}>Connect</button>
+          <p>Interviewer: {selectedAvatar?.name ?? 'Loading...'}</p>
+          <button onClick={connect} disabled={status !== 'idle' || !selectedAvatar}>Connect</button>
           <div style={{ height: 8 }} />
-          <button onClick={disconnect}>Disconnect</button>
+          <button onClick={disconnect} disabled={status === 'idle'}>Disconnect</button>
         </div>
         <AvatarStage glbPath={selectedAvatar?.glbPath ?? '/avatars/ava-01.glb'} remoteStream={remoteStream} />
       </div>
