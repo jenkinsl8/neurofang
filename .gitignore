@@ -1,0 +1,10 @@
+node_modules
+.next
+dist
+build
+.expo
+.env
+.env.*
+*.log
+coverage
+apps/server/data/recent-avatars.json

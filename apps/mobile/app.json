@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "name": "NeurofangMobile",
+    "slug": "neurofang-mobile",
+    "plugins": [
+      "react-native-webrtc"
+    ]
+  }
+}
