@@ -8,5 +8,8 @@ button { cursor: pointer; background: #2563eb; border: none; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
 .avatar-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
 .avatar-tile { border: 1px solid #2b3f59; border-radius: 10px; padding: 8px; }
+.avatar-thumbnail { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 8px; margin-bottom: 8px; border: 1px solid #334a67; }
+.avatar-selected-thumbnail { width: 120px; height: 120px; object-fit: cover; border-radius: 8px; border: 1px solid #334a67; margin-bottom: 10px; }
+.local-video { width: 100%; max-width: 260px; border-radius: 8px; border: 1px solid #334a67; background: #0b1020; }
 .stage { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 900px) { .stage { grid-template-columns: 1fr; } }

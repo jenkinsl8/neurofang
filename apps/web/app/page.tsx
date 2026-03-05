@@ -28,6 +28,7 @@ export default function Page() {
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
   const selectedAvatar = useMemo(
@@ -75,9 +76,15 @@ export default function Page() {
       peerRef.current = peer;
       setStatus('connecting');
 
-      const userStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const userStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
       localStreamRef.current = userStream;
-      userStream.getTracks().forEach((track) => peer.addTrack(track, userStream));
+      userStream
+        .getAudioTracks()
+        .forEach((track) => peer.addTrack(track, userStream));
+
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = userStream;
+      }
 
       const remote = new MediaStream();
       peer.ontrack = (event) => {
@@ -134,6 +141,9 @@ export default function Page() {
       remoteAudioRef.current.pause();
       remoteAudioRef.current.srcObject = null;
     }
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = null;
+    }
     setRemoteStream(null);
     setStatus('idle');
   }
@@ -163,6 +173,7 @@ export default function Page() {
           </button>
           {avatars.map((avatar) => (
             <button key={avatar.id} className="avatar-tile" onClick={() => setAvatarId(avatar.id)} style={{ outline: avatarId === avatar.id ? '2px solid #60a5fa' : 'none' }}>
+              <img src={avatar.thumbnailPath} alt={`${avatar.name} avatar preview`} className="avatar-thumbnail" />
               <strong>{avatar.name}</strong>
               <div>{avatar.gender} · {avatar.raceGroup}</div>
             </button>
@@ -176,9 +187,20 @@ export default function Page() {
           <h3>Interview stage</h3>
           <p>Status: {status}</p>
           <p>Interviewer: {selectedAvatar?.name ?? 'Loading...'}</p>
+          {selectedAvatar ? (
+            <img
+              src={selectedAvatar.thumbnailPath}
+              alt={`${selectedAvatar.name} interviewer thumbnail`}
+              className="avatar-selected-thumbnail"
+            />
+          ) : null}
           <button onClick={connect} disabled={status !== 'idle' || !selectedAvatar}>Connect</button>
           <div style={{ height: 8 }} />
           <button onClick={disconnect} disabled={status === 'idle'}>Disconnect</button>
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 13, marginBottom: 6 }}>Camera feed for expression tracking</div>
+            <video ref={localVideoRef} autoPlay muted playsInline className="local-video" />
+          </div>
         </div>
         <AvatarStage glbPath={selectedAvatar?.glbPath ?? '/avatars/ava-01.glb'} remoteStream={remoteStream} />
       </div>
