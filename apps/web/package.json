@@ -10,8 +10,8 @@
   },
   "dependencies": {
     "@neurofang/shared": "0.0.1",
-    "@react-three/drei": "^9.122.0",
-    "@react-three/fiber": "^8.17.14",
+    "@react-three/drei": "^10.0.0",
+    "@react-three/fiber": "^9.0.0",
     "next": "15.2.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",
