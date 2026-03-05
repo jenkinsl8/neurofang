@@ -68,6 +68,13 @@ async function generateAvatarThumbnail(avatarId: string) {
     return null;
   }
 
+  for (const assetDirectory of avatarAssetDirectories) {
+    const localAvatarThumbnailPath = path.join(assetDirectory, `${avatar.id}.svg`);
+    if (fs.existsSync(localAvatarThumbnailPath)) {
+      return localAvatarThumbnailPath;
+    }
+  }
+
   const outputPath = path.join(generatedAvatarDirectory, `${avatar.id}.jpg`);
   if (fs.existsSync(outputPath)) {
     return outputPath;
