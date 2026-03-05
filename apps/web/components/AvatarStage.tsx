@@ -28,7 +28,7 @@ export function AvatarStage({ glbPath, thumbnailPath, remoteStream, resetSignal 
     scene.background = new THREE.Color('#0b1020');
 
     const camera = new THREE.PerspectiveCamera(35, mount.clientWidth / mount.clientHeight, 0.1, 100);
-    camera.position.set(0, 1.5, 2.2);
+    camera.position.set(0, 1.4, 3.4);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -42,9 +42,10 @@ export function AvatarStage({ glbPath, thumbnailPath, remoteStream, resetSignal 
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enablePan = false;
-    controls.minDistance = 1.8;
-    controls.maxDistance = 3.2;
-    controls.target.set(0, 1.3, 0);
+    controls.minDistance = 1.9;
+    controls.maxDistance = 6.5;
+    controls.maxPolarAngle = Math.PI * 0.58;
+    controls.target.set(0, 1.05, 0);
     controls.update();
 
     const loader = new GLTFLoader();
@@ -59,26 +60,69 @@ export function AvatarStage({ glbPath, thumbnailPath, remoteStream, resetSignal 
     } = { audioContext: null, source: null, analyser: null };
     let smoothedJawOpen = 0;
 
+    const frameAvatarInView = (root: THREE.Object3D) => {
+      const box = new THREE.Box3().setFromObject(root);
+      if (box.isEmpty()) {
+        controls.target.set(0, 1.05, 0);
+        camera.position.set(0, 1.4, 3.4);
+        controls.update();
+        return;
+      }
+
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const verticalPadding = 1.25;
+      const fitHeight = Math.max(size.y * verticalPadding, 1.6);
+      const fov = THREE.MathUtils.degToRad(camera.fov);
+      const distanceByHeight = fitHeight / (2 * Math.tan(fov / 2));
+      const distanceByDepth = Math.max(size.z * 1.8, 1.7);
+      const distance = Math.max(distanceByHeight, distanceByDepth);
+
+      controls.target.set(center.x, center.y + size.y * 0.08, center.z);
+      camera.position.set(center.x, center.y + size.y * 0.12, center.z + distance);
+      camera.near = Math.max(0.1, distance * 0.05);
+      camera.far = Math.max(100, distance * 15);
+      camera.updateProjectionMatrix();
+      controls.minDistance = Math.max(1.4, distance * 0.55);
+      controls.maxDistance = Math.max(5.5, distance * 2.2);
+      controls.update();
+    };
+
     const loadProceduralFallbackAvatar = () => {
       const fallbackGroup = new THREE.Group();
 
-      const body = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.38, 0.9, 8, 16),
+      const torso = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.34, 0.72, 8, 16),
         new THREE.MeshStandardMaterial({ color: '#2d4f73', metalness: 0.05, roughness: 0.75 })
       );
-      body.position.set(0, 0.35, 0);
+      torso.position.set(0, 1.05, 0);
+
+      const hips = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.27, 0.36, 8, 12),
+        new THREE.MeshStandardMaterial({ color: '#253f5a', metalness: 0.05, roughness: 0.76 })
+      );
+      hips.position.set(0, 0.52, 0);
+
+      const leftLeg = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.13, 0.72, 8, 12),
+        new THREE.MeshStandardMaterial({ color: '#273a54', metalness: 0.03, roughness: 0.83 })
+      );
+      leftLeg.position.set(-0.15, -0.1, 0);
+
+      const rightLeg = leftLeg.clone();
+      rightLeg.position.x = 0.15;
 
       const head = new THREE.Mesh(
         new THREE.SphereGeometry(0.28, 32, 24),
         new THREE.MeshStandardMaterial({ color: '#e5c7a7', metalness: 0.05, roughness: 0.9 })
       );
-      head.position.set(0, 1.08, 0);
+      head.position.set(0, 1.72, 0);
 
       const portrait = new THREE.Mesh(
         new THREE.PlaneGeometry(0.34, 0.34),
         new THREE.MeshStandardMaterial({ color: '#1f2a44', metalness: 0.02, roughness: 0.8 })
       );
-      portrait.position.set(0, 1.1, 0.26);
+      portrait.position.set(0, 1.7, 0.27);
 
       const textureLoader = new THREE.TextureLoader();
       textureLoader.load(
@@ -103,12 +147,13 @@ export function AvatarStage({ glbPath, thumbnailPath, remoteStream, resetSignal 
         new THREE.MeshStandardMaterial({ color: '#d8b18b', metalness: 0.03, roughness: 0.9 })
       );
       jaw.name = 'Jaw';
-      jaw.position.set(0, 0.92, 0.15);
+      jaw.position.set(0, 1.56, 0.15);
 
-      fallbackGroup.add(body, head, portrait, jaw);
+      fallbackGroup.add(torso, hips, leftLeg, rightLeg, head, portrait, jaw);
       avatarRoot = fallbackGroup;
       jawBone = jaw;
       scene.add(fallbackGroup);
+      frameAvatarInView(fallbackGroup);
       setModelLoaded(true);
     };
 
@@ -116,8 +161,8 @@ export function AvatarStage({ glbPath, thumbnailPath, remoteStream, resetSignal 
       glbPath,
       (gltf) => {
         avatarRoot = gltf.scene;
-        avatarRoot.position.set(0, -1.45, 0);
         scene.add(avatarRoot);
+        frameAvatarInView(avatarRoot);
         setModelLoaded(true);
 
         avatarRoot.traverse((obj) => {
@@ -242,7 +287,7 @@ export function AvatarStage({ glbPath, thumbnailPath, remoteStream, resetSignal 
     <div className="stage-canvas-wrap">
       <div
         ref={mountRef}
-        style={{ width: '100%', height: 420, borderRadius: 12, overflow: 'hidden', border: '1px solid #2b3f59' }}
+        style={{ width: '100%', height: 560, borderRadius: 12, overflow: 'hidden', border: '1px solid #2b3f59' }}
       />
       {!modelLoaded ? (
         <div className="stage-fallback">
