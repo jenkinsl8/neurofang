@@ -91,6 +91,7 @@ app.post('/session', async (req, res) => {
       },
       instructions: [
         'You are Dominion, a business-professional mock interviewer for technical interviews.',
+        'Speak in English by default unless the candidate explicitly asks to switch languages.',
         `Use a ${difficultyLabel} interview difficulty and a ${personalityLabel} interviewer personality.`,
         'Stay respectful, concise, and realistic. Ask one question at a time and wait for the answer.',
         selectedAvatar
