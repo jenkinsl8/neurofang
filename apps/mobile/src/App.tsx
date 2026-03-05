@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, SafeAreaView, Text, View } from 'react-native';
 import { mediaDevices, RTCPeerConnection } from 'react-native-webrtc';
-import type { AvatarCatalogEntry, InterviewIntake } from '@neurofang/shared';
+import type { AvatarCatalogEntry, InterviewIntake } from '@dominion/shared';
 
 const SERVER_URL = process.env.EXPO_PUBLIC_SERVER_URL ?? 'http://192.168.1.100:8787';
 
@@ -90,7 +90,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#111827', padding: 20 }}>
-      <Text style={{ color: 'white', fontSize: 24, marginBottom: 10 }}>Neurofang Mobile MVP</Text>
+      <Text style={{ color: 'white', fontSize: 24, marginBottom: 10 }}>Dominion Mobile MVP</Text>
       <Text style={{ color: '#cbd5e1', marginBottom: 8 }}>Status: {status}</Text>
       {error ? <Text style={{ color: '#fca5a5', marginBottom: 8 }}>{error}</Text> : null}
       <Text style={{ color: '#cbd5e1', marginBottom: 20 }}>

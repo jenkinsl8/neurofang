@@ -1,4 +1,4 @@
-import type { AvatarCatalogEntry } from '@neurofang/shared';
+import type { AvatarCatalogEntry } from '@dominion/shared';
 
 export const avatarCatalog: AvatarCatalogEntry[] = [
   { id: 'ava-01', name: 'Noah', gender: 'male', raceGroup: 'black', glbPath: '/avatars/ava-01.glb', thumbnailPath: '/avatars/ava-01.png' },

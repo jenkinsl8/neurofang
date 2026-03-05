@@ -6,7 +6,7 @@ import type {
   InterviewDifficulty,
   InterviewPersonality,
   RealtimeSessionRequest
-} from '@neurofang/shared';
+} from '@dominion/shared';
 import { avatarCatalog } from './avatarCatalog.js';
 import { pickAvatar } from './avatarPicker.js';
 import { loadRecentAvatars } from './recentAvatarStore.js';
@@ -76,7 +76,7 @@ app.post('/session', async (req, res) => {
         }
       },
       instructions: [
-        'You are Neurofang, a business-professional mock interviewer for technical interviews.',
+        'You are Dominion, a business-professional mock interviewer for technical interviews.',
         `Use a ${difficultyLabel} interview difficulty and a ${personalityLabel} interviewer personality.`,
         'Stay respectful, concise, and realistic. Ask one question at a time and wait for the answer.',
         selectedAvatar
@@ -110,5 +110,5 @@ app.post('/session', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Neurofang server listening on http://localhost:${PORT}`);
+  console.log(`Dominion server listening on http://localhost:${PORT}`);
 });

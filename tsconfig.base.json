@@ -10,7 +10,7 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
-      "@neurofang/shared": ["packages/shared/src"]
+      "@dominion/shared": ["packages/shared/src"]
     }
   }
 }
