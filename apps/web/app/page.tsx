@@ -27,6 +27,7 @@ export default function Page() {
   const [error, setError] = useState<string>('');
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
   const selectedAvatar = useMemo(
@@ -84,10 +85,19 @@ export default function Page() {
         setRemoteStream(new MediaStream(remote.getTracks()));
       };
 
-      const audio = document.getElementById('remote-audio') as HTMLAudioElement;
+      const audio = remoteAudioRef.current;
       if (audio) {
         audio.srcObject = remote;
-        void audio.play();
+        void audio.play().catch((playError) => {
+          if (
+            playError instanceof DOMException &&
+            (playError.name === 'AbortError' || playError.name === 'NotAllowedError')
+          ) {
+            return;
+          }
+
+          setError(playError instanceof Error ? playError.message : 'Failed to play remote audio');
+        });
       }
 
       const offer = await peer.createOffer();
@@ -120,6 +130,10 @@ export default function Page() {
     localStreamRef.current = null;
     peerRef.current?.close();
     peerRef.current = null;
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.pause();
+      remoteAudioRef.current.srcObject = null;
+    }
     setRemoteStream(null);
     setStatus('idle');
   }
@@ -127,7 +141,7 @@ export default function Page() {
   return (
     <main>
       <h1>Neurofang MVP</h1>
-      <audio id="remote-audio" autoPlay playsInline />
+      <audio ref={remoteAudioRef} autoPlay playsInline />
       {error ? <p style={{ color: '#fca5a5' }}>{error}</p> : null}
       <div className="card">
         <h3>Interview intake</h3>
