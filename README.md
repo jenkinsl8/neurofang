@@ -98,15 +98,17 @@ npm run ios -w @dominion/mobile
 - Web and mobile default to “Pick for me” using `/api/avatars/pick`.
 - Recent IDs are persisted in `apps/server/data/recent-avatars.json` (created at runtime).
 
-## Ready Player Me assets (no copyrighted files committed)
+## Avatar assets
 
-This repo ships placeholder avatar paths only.
+This repo now includes free local interviewer thumbnail avatars (`apps/web/public/avatars/ava-01.svg` ... `ava-16.svg`) so the picker shows distinct people instead of a single placeholder image.
 
-Add your own RPM assets:
-1. Create/export full-body avatar from Ready Player Me.
+To upgrade to full 3D interviewers, add your own GLB assets:
+1. Create/export full-body avatar from Ready Player Me (or another source you have rights to use).
 2. Ensure ARKit-compatible blendshapes are present (`jawOpen`, `eyeBlinkLeft`, `eyeBlinkRight`).
-3. Place GLB + PNG thumbnail files in `apps/web/public/avatars` using `ava-01`...`ava-16` naming.
+3. Place GLB files in `apps/web/public/avatars` using `ava-01`...`ava-16` naming.
 4. Keep `apps/server/src/avatarCatalog.ts` IDs synchronized with files.
+
+Optional AI flow: you can generate replacement thumbnail portraits with your own model pipeline and overwrite the `ava-*.svg` files while preserving file names.
 
 ## 3D web interviewer behavior
 

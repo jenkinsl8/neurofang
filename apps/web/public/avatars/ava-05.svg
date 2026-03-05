@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Mateo avatar">
+<rect width="512" height="512" fill="#0b1220"/>
+<circle cx="256" cy="180" r="96" fill="#c68642"/>
+<path d="M160 172c8-54 46-92 96-92s88 38 96 92c-25-22-57-36-96-36s-71 14-96 36Z" fill="#3f2a1d"/>
+<ellipse cx="220" cy="180" rx="10" ry="7" fill="#0f172a"/>
+<ellipse cx="292" cy="180" rx="10" ry="7" fill="#0f172a"/>
+<path d="M224 220c9 13 22 20 32 20s23-7 32-20" stroke="#7c2d12" stroke-width="8" fill="none" stroke-linecap="round"/>
+<path d="M96 478c12-96 76-160 160-160s148 64 160 160" fill="#6d28d9"/>
+<path d="M192 350h128l-64 78z" fill="#e2e8f0"/>
+<text x="256" y="468" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="28" fill="#cbd5e1">Mateo</text>
+</svg>
