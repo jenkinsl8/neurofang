@@ -1,4 +1,4 @@
-# Neurofang MVP Monorepo
+# Dominion MVP Monorepo
 
 TypeScript monorepo MVP for voice-to-voice interview simulation with OpenAI Realtime over WebRTC.
 
@@ -69,9 +69,9 @@ This starts:
 
 ```bash
 npm run dev:mobile
-npm run android -w @neurofang/mobile
+npm run android -w @dominion/mobile
 # or
-npm run ios -w @neurofang/mobile
+npm run ios -w @dominion/mobile
 ```
 
 ## OpenAI Realtime Unified Interface flow

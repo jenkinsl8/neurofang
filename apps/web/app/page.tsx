@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { AvatarCatalogEntry, InterviewIntake } from '@neurofang/shared';
+import type { AvatarCatalogEntry, InterviewIntake } from '@dominion/shared';
 
 const AvatarStage = dynamic(
   () => import('../components/AvatarStage').then((module) => module.AvatarStage),
@@ -172,7 +172,7 @@ export default function Page() {
 
   return (
     <main>
-      <h1>Neurofang MVP</h1>
+      <h1>Dominion MVP</h1>
       <audio ref={remoteAudioRef} autoPlay playsInline />
       {error ? <p style={{ color: '#fca5a5' }}>{error}</p> : null}
       <div className="card">

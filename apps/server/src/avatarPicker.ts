@@ -1,4 +1,4 @@
-import type { AvatarCatalogEntry, AvatarPickRequest } from '@neurofang/shared';
+import type { AvatarCatalogEntry, AvatarPickRequest } from '@dominion/shared';
 import { avatarCatalog } from './avatarCatalog.js';
 import { getRecentAvatars, rememberAvatar } from './recentAvatarStore.js';
 

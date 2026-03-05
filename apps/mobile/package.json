@@ -1,5 +1,5 @@
 {
-  "name": "@neurofang/mobile",
+  "name": "@dominion/mobile",
   "version": "0.0.1",
   "private": true,
   "main": "index.ts",
@@ -10,7 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@neurofang/shared": "0.0.1",
+    "@dominion/shared": "0.0.1",
     "expo": "^52.0.28",
     "expo-dev-client": "^5.0.16",
     "react": "18.3.1",

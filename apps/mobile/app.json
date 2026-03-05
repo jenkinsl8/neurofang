@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "NeurofangMobile",
-    "slug": "neurofang-mobile",
+    "name": "DominionMobile",
+    "slug": "dominion-mobile",
     "plugins": [
       "react-native-webrtc"
     ]
