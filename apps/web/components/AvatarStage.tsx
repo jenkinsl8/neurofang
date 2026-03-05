@@ -57,6 +57,7 @@ export function AvatarStage({ glbPath, thumbnailPath, remoteStream, resetSignal 
       source: MediaStreamAudioSourceNode | null;
       analyser: AnalyserNode | null;
     } = { audioContext: null, source: null, analyser: null };
+    let smoothedJawOpen = 0;
 
     const loadProceduralFallbackAvatar = () => {
       const fallbackGroup = new THREE.Group();
@@ -172,11 +173,21 @@ export function AvatarStage({ glbPath, thumbnailPath, remoteStream, resetSignal 
         avatarRoot.rotation.x = nod;
       }
 
-      let jawOpen = 0.05;
+      let jawOpen = 0.03 + (Math.sin(elapsed * 2.5) + 1) * 0.01;
       if (analyserState.analyser) {
-        const samples = new Uint8Array(analyserState.analyser.frequencyBinCount);
-        analyserState.analyser.getByteFrequencyData(samples);
-        jawOpen = Math.min(1, samples.reduce((sum, value) => sum + value, 0) / samples.length / 110);
+        const samples = new Uint8Array(analyserState.analyser.fftSize);
+        analyserState.analyser.getByteTimeDomainData(samples);
+
+        let squareSum = 0;
+        for (const sample of samples) {
+          const normalized = (sample - 128) / 128;
+          squareSum += normalized * normalized;
+        }
+
+        const rms = Math.sqrt(squareSum / samples.length);
+        const targetJawOpen = Math.min(1, rms * 6.5);
+        smoothedJawOpen += (targetJawOpen - smoothedJawOpen) * 0.35;
+        jawOpen = Math.max(jawOpen, smoothedJawOpen);
       }
 
       for (const mesh of blendTargets) {

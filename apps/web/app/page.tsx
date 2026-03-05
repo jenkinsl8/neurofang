@@ -21,6 +21,10 @@ function resolveAssetUrl(path: string | undefined) {
     return path;
   }
 
+  if (path.startsWith('/')) {
+    return path;
+  }
+
   return `${SERVER_URL}${path}`;
 }
 
