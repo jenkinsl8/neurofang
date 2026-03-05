@@ -21,16 +21,6 @@ const allowedDifficulties: InterviewDifficulty[] = ['friendly', 'neutral', 'toug
 const allowedPersonalities: InterviewPersonality[] = ['friendly', 'analytical', 'skeptical', 'executive'];
 const generatedAvatarDirectory = path.resolve(process.cwd(), 'apps/server/data/generated-avatars');
 
-const raceDescription: Record<string, string> = {
-  black: 'Black',
-  white: 'White',
-  'east-asian': 'East Asian',
-  'south-asian': 'South Asian',
-  latino: 'Latino',
-  'middle-eastern': 'Middle Eastern',
-  mixed: 'mixed-ethnicity'
-};
-
 function normalizeDifficulty(value: unknown): InterviewDifficulty {
   return allowedDifficulties.includes(value as InterviewDifficulty) ? (value as InterviewDifficulty) : 'neutral';
 }
@@ -78,48 +68,18 @@ async function generateAvatarThumbnail(avatarId: string) {
     return null;
   }
 
-  const outputPath = path.join(generatedAvatarDirectory, `${avatar.id}.png`);
+  const outputPath = path.join(generatedAvatarDirectory, `${avatar.id}.jpg`);
   if (fs.existsSync(outputPath)) {
     return outputPath;
   }
 
-  if (!process.env.OPENAI_API_KEY) {
-    return null;
-  }
-
-  const prompt = [
-    'Photorealistic head-and-shoulders corporate portrait photo.',
-    `${avatar.gender} ${raceDescription[avatar.raceGroup] ?? avatar.raceGroup} professional named ${avatar.name}.`,
-    'Business attire, studio lighting, direct eye contact, neutral expression, plain office background.',
-    'Looks like a real camera photo, no illustration, no cartoon, no CGI, no text, no watermark.'
-  ].join(' ');
-
-  const response = await fetch('https://api.openai.com/v1/images/generations', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1',
-      prompt,
-      size: '1024x1024'
-    })
-  });
-
+  const response = await fetch(avatar.synthesiaThumbnailUrl);
   if (!response.ok) {
-    throw new Error(`Image generation failed: ${response.status} ${await response.text()}`);
+    throw new Error(`Synthesia thumbnail download failed: ${response.status} ${await response.text()}`);
   }
 
-  const payload = (await response.json()) as {
-    data?: Array<{ b64_json?: string }>;
-  };
-  const base64Image = payload.data?.[0]?.b64_json;
-  if (!base64Image) {
-    throw new Error('Image generation response was missing b64_json data.');
-  }
-
-  fs.writeFileSync(outputPath, Buffer.from(base64Image, 'base64'));
+  const imageData = Buffer.from(await response.arrayBuffer());
+  fs.writeFileSync(outputPath, imageData);
   return outputPath;
 }
 
@@ -141,7 +101,7 @@ app.get('/api/avatars/:avatarId/thumbnail', async (req, res) => {
     console.warn(`Failed generating thumbnail for ${avatar.id}:`, error);
   }
 
-  const fallbackPath = path.resolve(process.cwd(), 'apps/web/public', avatar.id ? `avatars/${avatar.id}.svg` : 'avatars/placeholder.svg');
+  const fallbackPath = path.resolve(process.cwd(), 'apps/web/public/avatars/placeholder.svg');
   if (fs.existsSync(fallbackPath)) {
     res.sendFile(fallbackPath);
     return;

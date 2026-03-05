@@ -224,7 +224,7 @@ export default function Page() {
       </div>
 
       <div className="card">
-        <h3>Avatar picker</h3>
+        <h3>Synthesia interviewer picker</h3>
         <div className="avatar-grid">
           <button className="avatar-tile" onClick={() => void pickRandomAvatar()}>
             <strong>Pick for me</strong>
@@ -257,12 +257,12 @@ export default function Page() {
           <div style={{ height: 8 }} />
           <button onClick={disconnect} disabled={status === 'idle'}>Disconnect</button>
           <div style={{ marginTop: 12 }}>
-            <div style={{ fontSize: 13, marginBottom: 6 }}>Camera feed for expression tracking</div>
+            <div style={{ fontSize: 13, marginBottom: 6 }}>Camera feed (optional local coaching modules)</div>
             <video ref={localVideoRef} autoPlay muted playsInline className="local-video" />
           </div>
         </div>
         <AvatarStage
-          glbPath={resolveAssetUrl(selectedAvatar?.glbPath)}
+          synthesiaEmbedUrl={selectedAvatar?.synthesiaEmbedUrl ?? ""}
           thumbnailPath={resolveAssetUrl(selectedAvatar?.thumbnailPath)}
           remoteStream={remoteStream}
           resetSignal={stageResetSignal}

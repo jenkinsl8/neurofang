@@ -1,20 +1,30 @@
 import type { AvatarCatalogEntry } from '@dominion/shared';
 
-export const avatarCatalog: AvatarCatalogEntry[] = [
-  { id: 'ava-01', name: 'Noah', gender: 'male', raceGroup: 'black', glbPath: '/avatars/ava-01.glb', thumbnailPath: '/api/avatars/ava-01/thumbnail' },
-  { id: 'ava-02', name: 'Liam', gender: 'male', raceGroup: 'white', glbPath: '/avatars/ava-02.glb', thumbnailPath: '/api/avatars/ava-02/thumbnail' },
-  { id: 'ava-03', name: 'Ethan', gender: 'male', raceGroup: 'east-asian', glbPath: '/avatars/ava-03.glb', thumbnailPath: '/api/avatars/ava-03/thumbnail' },
-  { id: 'ava-04', name: 'Arjun', gender: 'male', raceGroup: 'south-asian', glbPath: '/avatars/ava-04.glb', thumbnailPath: '/api/avatars/ava-04/thumbnail' },
-  { id: 'ava-05', name: 'Mateo', gender: 'male', raceGroup: 'latino', glbPath: '/avatars/ava-05.glb', thumbnailPath: '/api/avatars/ava-05/thumbnail' },
-  { id: 'ava-06', name: 'Omar', gender: 'male', raceGroup: 'middle-eastern', glbPath: '/avatars/ava-06.glb', thumbnailPath: '/api/avatars/ava-06/thumbnail' },
-  { id: 'ava-07', name: 'Kai', gender: 'male', raceGroup: 'mixed', glbPath: '/avatars/ava-07.glb', thumbnailPath: '/api/avatars/ava-07/thumbnail' },
-  { id: 'ava-08', name: 'Theo', gender: 'male', raceGroup: 'white', glbPath: '/avatars/ava-08.glb', thumbnailPath: '/api/avatars/ava-08/thumbnail' },
-  { id: 'ava-09', name: 'Ava', gender: 'female', raceGroup: 'black', glbPath: '/avatars/ava-09.glb', thumbnailPath: '/api/avatars/ava-09/thumbnail' },
-  { id: 'ava-10', name: 'Emma', gender: 'female', raceGroup: 'white', glbPath: '/avatars/ava-10.glb', thumbnailPath: '/api/avatars/ava-10/thumbnail' },
-  { id: 'ava-11', name: 'Mei', gender: 'female', raceGroup: 'east-asian', glbPath: '/avatars/ava-11.glb', thumbnailPath: '/api/avatars/ava-11/thumbnail' },
-  { id: 'ava-12', name: 'Anika', gender: 'female', raceGroup: 'south-asian', glbPath: '/avatars/ava-12.glb', thumbnailPath: '/api/avatars/ava-12/thumbnail' },
-  { id: 'ava-13', name: 'Sofia', gender: 'female', raceGroup: 'latino', glbPath: '/avatars/ava-13.glb', thumbnailPath: '/api/avatars/ava-13/thumbnail' },
-  { id: 'ava-14', name: 'Leila', gender: 'female', raceGroup: 'middle-eastern', glbPath: '/avatars/ava-14.glb', thumbnailPath: '/api/avatars/ava-14/thumbnail' },
-  { id: 'ava-15', name: 'Maya', gender: 'female', raceGroup: 'mixed', glbPath: '/avatars/ava-15.glb', thumbnailPath: '/api/avatars/ava-15/thumbnail' },
-  { id: 'ava-16', name: 'Grace', gender: 'female', raceGroup: 'white', glbPath: '/avatars/ava-16.glb', thumbnailPath: '/api/avatars/ava-16/thumbnail' }
+type Seed = Omit<AvatarCatalogEntry, 'thumbnailPath'>;
+
+const synthesiaBase = 'https://share.synthesia.io/embeds';
+const thumbnailProxy = (id: string) => `/api/avatars/${id}/thumbnail`;
+
+const seeds: Seed[] = [
+  { id: 'ava-01', name: 'Noah', gender: 'male', raceGroup: 'black', synthesiaAvatarId: 'anna_costume1_cameraA', synthesiaEmbedUrl: `${synthesiaBase}/anna_costume1_cameraA`, synthesiaThumbnailUrl: 'https://images.synthesia.io/avatars/anna_costume1_cameraA.jpg' },
+  { id: 'ava-02', name: 'Liam', gender: 'male', raceGroup: 'white', synthesiaAvatarId: 'luke_costume1_cameraA', synthesiaEmbedUrl: `${synthesiaBase}/luke_costume1_cameraA`, synthesiaThumbnailUrl: 'https://images.synthesia.io/avatars/luke_costume1_cameraA.jpg' },
+  { id: 'ava-03', name: 'Ethan', gender: 'male', raceGroup: 'east-asian', synthesiaAvatarId: 'james_costume1_cameraA', synthesiaEmbedUrl: `${synthesiaBase}/james_costume1_cameraA`, synthesiaThumbnailUrl: 'https://images.synthesia.io/avatars/james_costume1_cameraA.jpg' },
+  { id: 'ava-04', name: 'Arjun', gender: 'male', raceGroup: 'south-asian', synthesiaAvatarId: 'rajiv_costume1_cameraA', synthesiaEmbedUrl: `${synthesiaBase}/rajiv_costume1_cameraA`, synthesiaThumbnailUrl: 'https://images.synthesia.io/avatars/rajiv_costume1_cameraA.jpg' },
+  { id: 'ava-05', name: 'Mateo', gender: 'male', raceGroup: 'latino', synthesiaAvatarId: 'carlos_costume1_cameraA', synthesiaEmbedUrl: `${synthesiaBase}/carlos_costume1_cameraA`, synthesiaThumbnailUrl: 'https://images.synthesia.io/avatars/carlos_costume1_cameraA.jpg' },
+  { id: 'ava-06', name: 'Omar', gender: 'male', raceGroup: 'middle-eastern', synthesiaAvatarId: 'samir_costume1_cameraA', synthesiaEmbedUrl: `${synthesiaBase}/samir_costume1_cameraA`, synthesiaThumbnailUrl: 'https://images.synthesia.io/avatars/samir_costume1_cameraA.jpg' },
+  { id: 'ava-07', name: 'Kai', gender: 'male', raceGroup: 'mixed', synthesiaAvatarId: 'kai_costume1_cameraA', synthesiaEmbedUrl: `${synthesiaBase}/kai_costume1_cameraA`, synthesiaThumbnailUrl: 'https://images.synthesia.io/avatars/kai_costume1_cameraA.jpg' },
+  { id: 'ava-08', name: 'Theo', gender: 'male', raceGroup: 'white', synthesiaAvatarId: 'david_costume1_cameraA', synthesiaEmbedUrl: `${synthesiaBase}/david_costume1_cameraA`, synthesiaThumbnailUrl: 'https://images.synthesia.io/avatars/david_costume1_cameraA.jpg' },
+  { id: 'ava-09', name: 'Ava', gender: 'female', raceGroup: 'black', synthesiaAvatarId: 'jennifer_costume1_cameraA', synthesiaEmbedUrl: `${synthesiaBase}/jennifer_costume1_cameraA`, synthesiaThumbnailUrl: 'https://images.synthesia.io/avatars/jennifer_costume1_cameraA.jpg' },
+  { id: 'ava-10', name: 'Emma', gender: 'female', raceGroup: 'white', synthesiaAvatarId: 'emma_costume1_cameraA', synthesiaEmbedUrl: `${synthesiaBase}/emma_costume1_cameraA`, synthesiaThumbnailUrl: 'https://images.synthesia.io/avatars/emma_costume1_cameraA.jpg' },
+  { id: 'ava-11', name: 'Mei', gender: 'female', raceGroup: 'east-asian', synthesiaAvatarId: 'mei_costume1_cameraA', synthesiaEmbedUrl: `${synthesiaBase}/mei_costume1_cameraA`, synthesiaThumbnailUrl: 'https://images.synthesia.io/avatars/mei_costume1_cameraA.jpg' },
+  { id: 'ava-12', name: 'Anika', gender: 'female', raceGroup: 'south-asian', synthesiaAvatarId: 'anika_costume1_cameraA', synthesiaEmbedUrl: `${synthesiaBase}/anika_costume1_cameraA`, synthesiaThumbnailUrl: 'https://images.synthesia.io/avatars/anika_costume1_cameraA.jpg' },
+  { id: 'ava-13', name: 'Sofia', gender: 'female', raceGroup: 'latino', synthesiaAvatarId: 'sofia_costume1_cameraA', synthesiaEmbedUrl: `${synthesiaBase}/sofia_costume1_cameraA`, synthesiaThumbnailUrl: 'https://images.synthesia.io/avatars/sofia_costume1_cameraA.jpg' },
+  { id: 'ava-14', name: 'Leila', gender: 'female', raceGroup: 'middle-eastern', synthesiaAvatarId: 'leila_costume1_cameraA', synthesiaEmbedUrl: `${synthesiaBase}/leila_costume1_cameraA`, synthesiaThumbnailUrl: 'https://images.synthesia.io/avatars/leila_costume1_cameraA.jpg' },
+  { id: 'ava-15', name: 'Maya', gender: 'female', raceGroup: 'mixed', synthesiaAvatarId: 'maya_costume1_cameraA', synthesiaEmbedUrl: `${synthesiaBase}/maya_costume1_cameraA`, synthesiaThumbnailUrl: 'https://images.synthesia.io/avatars/maya_costume1_cameraA.jpg' },
+  { id: 'ava-16', name: 'Grace', gender: 'female', raceGroup: 'white', synthesiaAvatarId: 'grace_costume1_cameraA', synthesiaEmbedUrl: `${synthesiaBase}/grace_costume1_cameraA`, synthesiaThumbnailUrl: 'https://images.synthesia.io/avatars/grace_costume1_cameraA.jpg' }
 ];
+
+export const avatarCatalog: AvatarCatalogEntry[] = seeds.map((seed) => ({
+  ...seed,
+  thumbnailPath: thumbnailProxy(seed.id)
+}));
