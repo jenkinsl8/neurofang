@@ -1,6 +1,9 @@
 import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
+
+import fs from 'node:fs';
+import path from 'node:path';
 import type {
   AvatarPickRequest,
   InterviewDifficulty,
@@ -31,6 +34,17 @@ loadRecentAvatars();
 
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
+
+const avatarAssetDirectories = [
+  path.resolve(process.cwd(), 'apps/server/public/avatars'),
+  path.resolve(process.cwd(), 'apps/web/public/avatars')
+];
+
+for (const assetDirectory of avatarAssetDirectories) {
+  if (fs.existsSync(assetDirectory)) {
+    app.use('/avatars', express.static(assetDirectory));
+  }
+}
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true });

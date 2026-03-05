@@ -72,6 +72,30 @@ export function AvatarStage({ glbPath, thumbnailPath, remoteStream }: Props) {
       );
       head.position.set(0, 1.08, 0);
 
+      const portrait = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.34, 0.34),
+        new THREE.MeshStandardMaterial({ color: '#1f2a44', metalness: 0.02, roughness: 0.8 })
+      );
+      portrait.position.set(0, 1.1, 0.26);
+
+      const textureLoader = new THREE.TextureLoader();
+      textureLoader.load(
+        thumbnailPath,
+        (texture) => {
+          const material = portrait.material as THREE.MeshStandardMaterial;
+          material.map = texture;
+          material.needsUpdate = true;
+        },
+        undefined,
+        () => {
+          textureLoader.load(FALLBACK_THUMBNAIL, (texture) => {
+            const material = portrait.material as THREE.MeshStandardMaterial;
+            material.map = texture;
+            material.needsUpdate = true;
+          });
+        }
+      );
+
       const jaw = new THREE.Mesh(
         new THREE.BoxGeometry(0.26, 0.12, 0.22),
         new THREE.MeshStandardMaterial({ color: '#d8b18b', metalness: 0.03, roughness: 0.9 })
@@ -79,7 +103,7 @@ export function AvatarStage({ glbPath, thumbnailPath, remoteStream }: Props) {
       jaw.name = 'Jaw';
       jaw.position.set(0, 0.92, 0.15);
 
-      fallbackGroup.add(body, head, jaw);
+      fallbackGroup.add(body, head, portrait, jaw);
       avatarRoot = fallbackGroup;
       jawBone = jaw;
       scene.add(fallbackGroup);

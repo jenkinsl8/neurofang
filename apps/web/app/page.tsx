@@ -12,6 +12,18 @@ const AvatarStage = dynamic(
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:8787';
 const FALLBACK_THUMBNAIL = '/avatars/placeholder.svg';
 
+function resolveAssetUrl(path: string | undefined) {
+  if (!path) {
+    return FALLBACK_THUMBNAIL;
+  }
+
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+
+  return `${SERVER_URL}${path}`;
+}
+
 const defaultIntake: InterviewIntake = {
   company: 'Acme',
   jobTitle: 'Frontend Engineer',
@@ -195,7 +207,7 @@ export default function Page() {
           </button>
           {avatars.map((avatar) => (
             <button key={avatar.id} className="avatar-tile" onClick={() => setAvatarId(avatar.id)} style={{ outline: avatarId === avatar.id ? '2px solid #60a5fa' : 'none' }}>
-              <AvatarThumbnail src={avatar.thumbnailPath} alt={`${avatar.name} avatar preview`} className="avatar-thumbnail" />
+              <AvatarThumbnail src={resolveAssetUrl(avatar.thumbnailPath)} alt={`${avatar.name} avatar preview`} className="avatar-thumbnail" />
               <strong>{avatar.name}</strong>
               <div>{avatar.gender} · {avatar.raceGroup}</div>
             </button>
@@ -211,7 +223,7 @@ export default function Page() {
           <p>Interviewer: {selectedAvatar?.name ?? 'Loading...'}</p>
           {selectedAvatar ? (
             <AvatarThumbnail
-              src={selectedAvatar.thumbnailPath}
+              src={resolveAssetUrl(selectedAvatar.thumbnailPath)}
               alt={`${selectedAvatar.name} interviewer thumbnail`}
               className="avatar-selected-thumbnail"
             />
@@ -225,8 +237,8 @@ export default function Page() {
           </div>
         </div>
         <AvatarStage
-          glbPath={selectedAvatar?.glbPath ?? '/avatars/ava-01.glb'}
-          thumbnailPath={selectedAvatar?.thumbnailPath ?? FALLBACK_THUMBNAIL}
+          glbPath={resolveAssetUrl(selectedAvatar?.glbPath)}
+          thumbnailPath={resolveAssetUrl(selectedAvatar?.thumbnailPath)}
           remoteStream={remoteStream}
         />
       </div>
