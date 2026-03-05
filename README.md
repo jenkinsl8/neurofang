@@ -103,7 +103,7 @@ npm run ios -w @dominion/mobile
 
 This repo includes default local SVG avatars as a fallback, and now supports on-demand AI generation of photorealistic interviewer photos via `GET /api/avatars/:avatarId/thumbnail`. Generated images are cached to `apps/server/data/generated-avatars` and reused.
 
-To upgrade to full 3D interviewers, add your own GLB assets:
+Full 3D interviewers are enabled in the web app. To use production-quality models, add your own GLB assets:
 1. Create/export full-body avatar from Ready Player Me (or another source you have rights to use).
 2. Ensure ARKit-compatible blendshapes are present (`jawOpen`, `eyeBlinkLeft`, `eyeBlinkRight`).
 3. Place GLB files in `apps/web/public/avatars` using `ava-01`...`ava-16` naming.
@@ -117,7 +117,7 @@ If you want realistic photo thumbnails (instead of cartoons):
 
 ## 3D web interviewer behavior
 
-`apps/web` renders a head-and-shoulders interviewer using `react-three-fiber` + `drei` and applies:
+`apps/web` renders a full-body interviewer with automatic camera framing and applies:
 - idle motion
 - blink animation
 - listening nods
