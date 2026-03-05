@@ -57,6 +57,35 @@ export function AvatarStage({ glbPath, thumbnailPath, remoteStream }: Props) {
       analyser: AnalyserNode | null;
     } = { audioContext: null, source: null, analyser: null };
 
+    const loadProceduralFallbackAvatar = () => {
+      const fallbackGroup = new THREE.Group();
+
+      const body = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.38, 0.9, 8, 16),
+        new THREE.MeshStandardMaterial({ color: '#2d4f73', metalness: 0.05, roughness: 0.75 })
+      );
+      body.position.set(0, 0.35, 0);
+
+      const head = new THREE.Mesh(
+        new THREE.SphereGeometry(0.28, 32, 24),
+        new THREE.MeshStandardMaterial({ color: '#e5c7a7', metalness: 0.05, roughness: 0.9 })
+      );
+      head.position.set(0, 1.08, 0);
+
+      const jaw = new THREE.Mesh(
+        new THREE.BoxGeometry(0.26, 0.12, 0.22),
+        new THREE.MeshStandardMaterial({ color: '#d8b18b', metalness: 0.03, roughness: 0.9 })
+      );
+      jaw.name = 'Jaw';
+      jaw.position.set(0, 0.92, 0.15);
+
+      fallbackGroup.add(body, head, jaw);
+      avatarRoot = fallbackGroup;
+      jawBone = jaw;
+      scene.add(fallbackGroup);
+      setModelLoaded(true);
+    };
+
     loader.load(
       glbPath,
       (gltf) => {
@@ -79,7 +108,7 @@ export function AvatarStage({ glbPath, thumbnailPath, remoteStream }: Props) {
       },
       undefined,
       () => {
-        setModelLoaded(false);
+        loadProceduralFallbackAvatar();
       }
     );
 
