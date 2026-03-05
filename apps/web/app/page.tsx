@@ -1,8 +1,13 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AvatarCatalogEntry, InterviewIntake } from '@neurofang/shared';
-import { AvatarStage } from '../components/AvatarStage';
+
+const AvatarStage = dynamic(
+  () => import('../components/AvatarStage').then((module) => module.AvatarStage),
+  { ssr: false }
+);
 
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:8787';
 
