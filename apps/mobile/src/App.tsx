@@ -102,9 +102,9 @@ export default function App() {
       <View style={{ height: 12 }} />
       <Button title="Disconnect" onPress={disconnect} disabled={status === 'idle'} />
       <View style={{ marginTop: 24, padding: 12, borderColor: '#334155', borderWidth: 1, borderRadius: 8 }}>
-        <Text style={{ color: '#e2e8f0' }}>3D avatar placeholder</Text>
+        <Text style={{ color: '#e2e8f0' }}>Synthesia interviewer placeholder</Text>
         <Text style={{ color: '#94a3b8', marginTop: 8 }}>
-          For production mobile 3D, use expo-three + @react-three/fiber/native and connect to the same lip-sync signal path used on web.
+          For production mobile rendering, open the selected Synthesia embed URL in a WebView and mirror the same avatar selection used on web.
         </Text>
       </View>
     </SafeAreaView>

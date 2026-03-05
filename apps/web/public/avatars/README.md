@@ -1,14 +1,13 @@
-Avatar assets live here.
+# Avatar assets
 
-Included by default:
 - `ava-01.svg` ... `ava-16.svg`: local fallback interviewer thumbnails.
+- `placeholder.svg`: generic fallback used when a thumbnail is unavailable.
 
-AI-generated realistic photos:
-- The server endpoint `GET /api/avatars/:avatarId/thumbnail` can generate photorealistic thumbnails using OpenAI (`gpt-image-1` by default).
-- Generated files are cached in `apps/server/data/generated-avatars`.
-- If generation is unavailable (for example no API key), the app falls back to these local SVG files.
+Runtime-generated Synthesia thumbnails:
+- The server endpoint `GET /api/avatars/:avatarId/thumbnail` downloads the configured Synthesia interviewer thumbnail (`synthesiaThumbnailUrl`) and caches it to `apps/server/data/generated-avatars`.
+- If download fails, the API falls back to `placeholder.svg`.
 
-Optional (recommended for full 3D):
-- `ava-01.glb` ... `ava-16.glb`: Ready Player Me (or equivalent) GLB avatars with ARKit blendshapes.
-
-If a GLB is missing, the web app falls back to a built-in simple 3D bust so the flow still works.
+To replace interviewers:
+1. Create or select interviewers in Synthesia (free tier is supported).
+2. Update `apps/server/src/avatarCatalog.ts` with each interviewer's `synthesiaAvatarId`, `synthesiaEmbedUrl`, and `synthesiaThumbnailUrl`.
+3. Restart the server and open the avatar picker; thumbnails will be generated and cached automatically.

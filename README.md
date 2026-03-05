@@ -5,7 +5,7 @@ TypeScript monorepo MVP for voice-to-voice interview simulation with OpenAI Real
 ## Workspace layout
 
 - `apps/server` – Express API: session relay + avatar APIs.
-- `apps/web` – Next.js interview UI + 3D interviewer.
+- `apps/web` – Next.js interview UI + Synthesia interviewer stage.
 - `apps/mobile` – Expo dev client + `react-native-webrtc` interview flow.
 - `packages/shared` – shared types used by apps.
 
@@ -37,7 +37,6 @@ cp apps/mobile/.env.example apps/mobile/.env
 OPENAI_API_KEY=sk-...
 OPENAI_REALTIME_MODEL=gpt-4o-realtime-preview
 OPENAI_REALTIME_VOICE=alloy
-OPENAI_IMAGE_MODEL=gpt-image-1
 PORT=8787
 AZURE_SPEECH_KEY=
 AZURE_SPEECH_REGION=
@@ -101,28 +100,21 @@ npm run ios -w @dominion/mobile
 
 ## Avatar assets
 
-This repo includes default local SVG avatars as a fallback, and now supports on-demand AI generation of photorealistic interviewer photos via `GET /api/avatars/:avatarId/thumbnail`. Generated images are cached to `apps/server/data/generated-avatars` and reused.
+This repo includes default local SVG fallbacks and Synthesia-backed interviewer metadata in `apps/server/src/avatarCatalog.ts`.
 
-Full 3D interviewers are enabled in the web app. To use production-quality models, add your own GLB assets:
-1. Create/export full-body avatar from Ready Player Me (or another source you have rights to use).
-2. Ensure ARKit-compatible blendshapes are present (`jawOpen`, `eyeBlinkLeft`, `eyeBlinkRight`).
-3. Place GLB files in `apps/web/public/avatars` using `ava-01`...`ava-16` naming.
-4. Keep `apps/server/src/avatarCatalog.ts` IDs synchronized with files.
+Thumbnail generation flow:
+1. `GET /api/avatars/:avatarId/thumbnail` downloads the configured `synthesiaThumbnailUrl`.
+2. The server caches the result at `apps/server/data/generated-avatars/<avatarId>.jpg`.
+3. If the download fails, the API falls back to `apps/web/public/avatars/placeholder.svg`.
 
+To switch interviewers to your own Synthesia free-tier set:
+1. Create interviewers in Synthesia.
+2. Update `synthesiaAvatarId`, `synthesiaEmbedUrl`, and `synthesiaThumbnailUrl` in `apps/server/src/avatarCatalog.ts`.
+3. Restart the server and reload the web app to regenerate thumbnails.
 
-If you want realistic photo thumbnails (instead of cartoons):
-1. Set `OPENAI_API_KEY` in `apps/server/.env`.
-2. (Optional) change `OPENAI_IMAGE_MODEL` from the default `gpt-image-1`.
-3. Start the server and open the web app avatar picker; the server will generate and cache professional headshot-style thumbnails per avatar ID.
+## Web interviewer behavior
 
-## 3D web interviewer behavior
-
-`apps/web` renders a full-body interviewer with automatic camera framing and applies:
-- idle motion
-- blink animation
-- listening nods
-- audio-driven lip sync from remote stream analyzer
-- jaw-bone rotation fallback when ARKit blendshape is missing
+`apps/web` renders the selected interviewer through a Synthesia embed and overlays realtime voice-activity level from the OpenAI remote audio stream.
 
 ## Optional modules scaffold
 
