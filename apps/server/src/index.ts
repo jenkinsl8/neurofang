@@ -70,7 +70,11 @@ app.post('/session', async (req, res) => {
     JSON.stringify({
       type: 'realtime',
       model: process.env.OPENAI_REALTIME_MODEL ?? 'gpt-4o-realtime-preview',
-      voice: process.env.OPENAI_REALTIME_VOICE ?? 'alloy',
+      audio: {
+        output: {
+          voice: process.env.OPENAI_REALTIME_VOICE ?? 'alloy'
+        }
+      },
       instructions: [
         'You are Neurofang, a business-professional mock interviewer for technical interviews.',
         `Use a ${difficultyLabel} interview difficulty and a ${personalityLabel} interviewer personality.`,
