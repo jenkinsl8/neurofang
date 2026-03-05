@@ -1,0 +1,7 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="32" fill="#0f172a"/>
+  <rect x="96" y="96" width="320" height="320" rx="24" fill="#1e293b" stroke="#334155" stroke-width="8"/>
+  <circle cx="256" cy="214" r="76" fill="#64748b"/>
+  <path d="M152 364c18-57 59-88 104-88s86 31 104 88" stroke="#94a3b8" stroke-width="26" stroke-linecap="round"/>
+  <text x="256" y="458" text-anchor="middle" fill="#cbd5e1" font-family="Arial, sans-serif" font-size="24">Avatar Preview</text>
+</svg>

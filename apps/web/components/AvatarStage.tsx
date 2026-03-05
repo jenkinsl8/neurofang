@@ -1,21 +1,27 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useState, type SyntheticEvent } from 'react';
+import { useRef } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 type Props = {
   glbPath: string;
+  thumbnailPath: string;
   remoteStream?: MediaStream | null;
 };
 
-export function AvatarStage({ glbPath, remoteStream }: Props) {
+const FALLBACK_THUMBNAIL = '/avatars/placeholder.svg';
+
+export function AvatarStage({ glbPath, thumbnailPath, remoteStream }: Props) {
   const mountRef = useRef<HTMLDivElement | null>(null);
+  const [modelLoaded, setModelLoaded] = useState(false);
 
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return;
+    setModelLoaded(false);
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#0b1020');
@@ -57,6 +63,7 @@ export function AvatarStage({ glbPath, remoteStream }: Props) {
         avatarRoot = gltf.scene;
         avatarRoot.position.set(0, -1.45, 0);
         scene.add(avatarRoot);
+        setModelLoaded(true);
 
         avatarRoot.traverse((obj) => {
           if ((obj as THREE.Mesh).isMesh) {
@@ -72,7 +79,7 @@ export function AvatarStage({ glbPath, remoteStream }: Props) {
       },
       undefined,
       () => {
-        // Keep stage interactive even if model loading fails.
+        setModelLoaded(false);
       }
     );
 
@@ -163,9 +170,28 @@ export function AvatarStage({ glbPath, remoteStream }: Props) {
   }, [glbPath, remoteStream]);
 
   return (
-    <div
-      ref={mountRef}
-      style={{ width: '100%', height: 420, borderRadius: 12, overflow: 'hidden', border: '1px solid #2b3f59' }}
-    />
+    <div className="stage-canvas-wrap">
+      <div
+        ref={mountRef}
+        style={{ width: '100%', height: 420, borderRadius: 12, overflow: 'hidden', border: '1px solid #2b3f59' }}
+      />
+      {!modelLoaded ? (
+        <div className="stage-fallback">
+          <img
+            src={thumbnailPath}
+            alt="Interviewer preview"
+            className="stage-fallback-image"
+            onError={(event: SyntheticEvent<HTMLImageElement>) => {
+              const target = event.currentTarget;
+              if (target.src.endsWith(FALLBACK_THUMBNAIL)) {
+                return;
+              }
+              target.src = FALLBACK_THUMBNAIL;
+            }}
+          />
+          <p>Avatar model not found yet. Add the GLB file to continue with 3D animation.</p>
+        </div>
+      ) : null}
+    </div>
   );
 }

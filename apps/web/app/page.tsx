@@ -10,6 +10,7 @@ const AvatarStage = dynamic(
 );
 
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:8787';
+const FALLBACK_THUMBNAIL = '/avatars/placeholder.svg';
 
 const defaultIntake: InterviewIntake = {
   company: 'Acme',
@@ -18,6 +19,27 @@ const defaultIntake: InterviewIntake = {
   difficulty: 'neutral',
   personality: 'friendly'
 };
+
+function AvatarThumbnail({ src, alt, className }: { src: string; alt: string; className: string }) {
+  const [imageSrc, setImageSrc] = useState(src);
+
+  useEffect(() => {
+    setImageSrc(src);
+  }, [src]);
+
+  return (
+    <img
+      src={imageSrc}
+      alt={alt}
+      className={className}
+      onError={() => {
+        if (imageSrc !== FALLBACK_THUMBNAIL) {
+          setImageSrc(FALLBACK_THUMBNAIL);
+        }
+      }}
+    />
+  );
+}
 
 export default function Page() {
   const [intake, setIntake] = useState<InterviewIntake>(defaultIntake);
@@ -173,7 +195,7 @@ export default function Page() {
           </button>
           {avatars.map((avatar) => (
             <button key={avatar.id} className="avatar-tile" onClick={() => setAvatarId(avatar.id)} style={{ outline: avatarId === avatar.id ? '2px solid #60a5fa' : 'none' }}>
-              <img src={avatar.thumbnailPath} alt={`${avatar.name} avatar preview`} className="avatar-thumbnail" />
+              <AvatarThumbnail src={avatar.thumbnailPath} alt={`${avatar.name} avatar preview`} className="avatar-thumbnail" />
               <strong>{avatar.name}</strong>
               <div>{avatar.gender} · {avatar.raceGroup}</div>
             </button>
@@ -188,7 +210,7 @@ export default function Page() {
           <p>Status: {status}</p>
           <p>Interviewer: {selectedAvatar?.name ?? 'Loading...'}</p>
           {selectedAvatar ? (
-            <img
+            <AvatarThumbnail
               src={selectedAvatar.thumbnailPath}
               alt={`${selectedAvatar.name} interviewer thumbnail`}
               className="avatar-selected-thumbnail"
@@ -202,7 +224,11 @@ export default function Page() {
             <video ref={localVideoRef} autoPlay muted playsInline className="local-video" />
           </div>
         </div>
-        <AvatarStage glbPath={selectedAvatar?.glbPath ?? '/avatars/ava-01.glb'} remoteStream={remoteStream} />
+        <AvatarStage
+          glbPath={selectedAvatar?.glbPath ?? '/avatars/ava-01.glb'}
+          thumbnailPath={selectedAvatar?.thumbnailPath ?? FALLBACK_THUMBNAIL}
+          remoteStream={remoteStream}
+        />
       </div>
     </main>
   );
