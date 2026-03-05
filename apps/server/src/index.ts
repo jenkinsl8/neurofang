@@ -103,7 +103,7 @@ async function generateAvatarThumbnail(avatarId: string) {
     body: JSON.stringify({
       model: process.env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1',
       prompt,
-      size: '512x512'
+      size: '1024x1024'
     })
   });
 
