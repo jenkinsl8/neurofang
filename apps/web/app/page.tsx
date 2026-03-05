@@ -64,6 +64,7 @@ export default function Page() {
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [stageResetSignal, setStageResetSignal] = useState(0);
 
   const selectedAvatar = useMemo(
     () => avatars.find((avatar) => avatar.id === avatarId) ?? avatars[0],
@@ -103,9 +104,24 @@ export default function Page() {
     })();
   }, []);
 
+  useEffect(() => {
+    const handlePageHide = () => {
+      disconnect();
+    };
+
+    window.addEventListener('beforeunload', handlePageHide);
+    window.addEventListener('pagehide', handlePageHide);
+
+    return () => {
+      window.removeEventListener('beforeunload', handlePageHide);
+      window.removeEventListener('pagehide', handlePageHide);
+    };
+  }, []);
+
   async function connect() {
     try {
       setError('');
+      setStageResetSignal((current) => current + 1);
       const peer = new RTCPeerConnection();
       peerRef.current = peer;
       setStatus('connecting');
@@ -179,6 +195,7 @@ export default function Page() {
       localVideoRef.current.srcObject = null;
     }
     setRemoteStream(null);
+    setStageResetSignal((current) => current + 1);
     setStatus('idle');
   }
 
@@ -240,6 +257,7 @@ export default function Page() {
           glbPath={resolveAssetUrl(selectedAvatar?.glbPath)}
           thumbnailPath={resolveAssetUrl(selectedAvatar?.thumbnailPath)}
           remoteStream={remoteStream}
+          resetSignal={stageResetSignal}
         />
       </div>
     </main>

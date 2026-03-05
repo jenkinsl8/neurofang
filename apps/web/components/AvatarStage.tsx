@@ -10,11 +10,12 @@ type Props = {
   glbPath: string;
   thumbnailPath: string;
   remoteStream?: MediaStream | null;
+  resetSignal?: number;
 };
 
 const FALLBACK_THUMBNAIL = '/avatars/placeholder.svg';
 
-export function AvatarStage({ glbPath, thumbnailPath, remoteStream }: Props) {
+export function AvatarStage({ glbPath, thumbnailPath, remoteStream, resetSignal = 0 }: Props) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const [modelLoaded, setModelLoaded] = useState(false);
 
@@ -145,6 +146,10 @@ export function AvatarStage({ glbPath, thumbnailPath, remoteStream }: Props) {
       analyserState.audioContext = audioContext;
       analyserState.source = source;
       analyserState.analyser = analyser;
+
+      if (audioContext.state === 'suspended') {
+        void audioContext.resume();
+      }
     }
 
     const onResize = () => {
@@ -220,7 +225,7 @@ export function AvatarStage({ glbPath, thumbnailPath, remoteStream }: Props) {
       renderer.dispose();
       mount.removeChild(renderer.domElement);
     };
-  }, [glbPath, remoteStream]);
+  }, [glbPath, remoteStream, resetSignal]);
 
   return (
     <div className="stage-canvas-wrap">
