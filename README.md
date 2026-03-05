@@ -37,6 +37,7 @@ cp apps/mobile/.env.example apps/mobile/.env
 OPENAI_API_KEY=sk-...
 OPENAI_REALTIME_MODEL=gpt-4o-realtime-preview
 OPENAI_REALTIME_VOICE=alloy
+OPENAI_IMAGE_MODEL=gpt-image-1
 PORT=8787
 AZURE_SPEECH_KEY=
 AZURE_SPEECH_REGION=
@@ -100,7 +101,7 @@ npm run ios -w @dominion/mobile
 
 ## Avatar assets
 
-This repo now includes free local interviewer thumbnail avatars (`apps/web/public/avatars/ava-01.svg` ... `ava-16.svg`) so the picker shows distinct people instead of a single placeholder image.
+This repo includes default local SVG avatars as a fallback, and now supports on-demand AI generation of photorealistic interviewer photos via `GET /api/avatars/:avatarId/thumbnail`. Generated images are cached to `apps/server/data/generated-avatars` and reused.
 
 To upgrade to full 3D interviewers, add your own GLB assets:
 1. Create/export full-body avatar from Ready Player Me (or another source you have rights to use).
@@ -108,7 +109,11 @@ To upgrade to full 3D interviewers, add your own GLB assets:
 3. Place GLB files in `apps/web/public/avatars` using `ava-01`...`ava-16` naming.
 4. Keep `apps/server/src/avatarCatalog.ts` IDs synchronized with files.
 
-Optional AI flow: you can generate replacement thumbnail portraits with your own model pipeline and overwrite the `ava-*.svg` files while preserving file names.
+
+If you want realistic photo thumbnails (instead of cartoons):
+1. Set `OPENAI_API_KEY` in `apps/server/.env`.
+2. (Optional) change `OPENAI_IMAGE_MODEL` from the default `gpt-image-1`.
+3. Start the server and open the web app avatar picker; the server will generate and cache professional headshot-style thumbnails per avatar ID.
 
 ## 3D web interviewer behavior
 
