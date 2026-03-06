@@ -13,13 +13,15 @@ type Props = {
 const FALLBACK_THUMBNAIL = '/avatars/placeholder.svg';
 
 export function AvatarStage({ synthesiaEmbedUrl, thumbnailPath, remoteStream, resetSignal = 0 }: Props) {
-  const [imageSrc, setImageSrc] = useState(thumbnailPath);
+  const [imageSrc, setImageSrc] = useState(thumbnailPath || FALLBACK_THUMBNAIL);
   const [speechLevel, setSpeechLevel] = useState(0);
   const [hasEmbedError, setHasEmbedError] = useState(false);
   const iframeKeyRef = useRef(0);
+  const embedUrl = synthesiaEmbedUrl.trim();
+  const hasEmbedUrl = embedUrl.length > 0;
 
   useEffect(() => {
-    setImageSrc(thumbnailPath);
+    setImageSrc(thumbnailPath || FALLBACK_THUMBNAIL);
   }, [thumbnailPath]);
 
   useEffect(() => {
@@ -74,20 +76,24 @@ export function AvatarStage({ synthesiaEmbedUrl, thumbnailPath, remoteStream, re
 
   return (
     <div className="stage-canvas-wrap" style={{ width: '100%' }}>
-      {!hasEmbedError ? (
+      {!hasEmbedError && hasEmbedUrl ? (
         <iframe
           key={iframeKeyRef.current}
-          src={synthesiaEmbedUrl}
+          src={embedUrl}
           style={{ width: '100%', height: 560, borderRadius: 12, overflow: 'hidden', border: '1px solid #2b3f59' }}
           allow="autoplay; fullscreen"
           title="Synthesia interviewer"
           onError={() => setHasEmbedError(true)}
         />
       ) : null}
-      {hasEmbedError ? (
+      {hasEmbedError || !hasEmbedUrl ? (
         <div className="stage-fallback">
           <img src={imageSrc} alt="Interviewer preview" className="stage-fallback-image" onError={() => setImageSrc(FALLBACK_THUMBNAIL)} />
-          <p>Synthesia embed could not load. Using generated thumbnail fallback.</p>
+          <p>
+            {hasEmbedUrl
+              ? 'Synthesia embed could not load. Using generated thumbnail fallback.'
+              : 'Synthesia embed URL is unavailable. Using generated thumbnail fallback.'}
+          </p>
         </div>
       ) : null}
       <div style={{ marginTop: 8, fontSize: 12, color: '#93c5fd' }}>
