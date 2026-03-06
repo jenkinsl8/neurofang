@@ -5,7 +5,7 @@ TypeScript monorepo MVP for voice-to-voice interview simulation with OpenAI Real
 ## Workspace layout
 
 - `apps/server` – Express API: session relay + avatar APIs.
-- `apps/web` – Next.js interview UI + Synthesia interviewer stage.
+- `apps/web` – Next.js interview UI + MakeHuman/Unity interviewer stage.
 - `apps/mobile` – Expo dev client + `react-native-webrtc` interview flow.
 - `packages/shared` – shared types used by apps.
 
@@ -98,23 +98,25 @@ npm run ios -w @dominion/mobile
 - Web and mobile default to “Pick for me” using `/api/avatars/pick`.
 - Recent IDs are persisted in `apps/server/data/recent-avatars.json` (created at runtime).
 
-## Avatar assets
+## MakeHuman + Unity interviewer assets
 
-This repo includes default local SVG fallbacks and Synthesia-backed interviewer metadata in `apps/server/src/avatarCatalog.ts`.
+The default interviewer catalog now uses pre-rigged MakeHuman IDs (`makeHumanModelId`) and Unity scene URLs (`unitySceneUrl`) in `apps/server/src/avatarCatalog.ts`.
 
-Thumbnail generation flow:
-1. `GET /api/avatars/:avatarId/thumbnail` downloads the configured `synthesiaThumbnailUrl`.
-2. The server caches the result at `apps/server/data/generated-avatars/<avatarId>.jpg`.
-3. If the download fails, the API falls back to `apps/web/public/avatars/placeholder.svg`.
+Current local setup:
+1. `apps/web/public/unity/interviewer/index.html` is a lightweight Unity-stage mock that listens for postMessage stage events.
+2. `apps/web/components/AvatarStage.tsx` computes voice activity from remote audio and sends `{ speechLevel, isSpeaking, isListening }` to the scene.
+3. `/api/avatars/:avatarId/thumbnail` serves local avatar SVG thumbnails and falls back to `apps/web/public/avatars/placeholder.svg`.
 
-To switch interviewers to your own Synthesia free-tier set:
-1. Create interviewers in Synthesia.
-2. Update `synthesiaAvatarId`, `synthesiaEmbedUrl`, and `synthesiaThumbnailUrl` in `apps/server/src/avatarCatalog.ts`.
-3. Restart the server and reload the web app to regenerate thumbnails.
+To switch to real Unity WebGL builds with MakeHuman rigs:
+1. Export your pre-rigged MakeHuman characters (FBX) and import into Unity.
+2. Build a head-and-shoulders scene with idle/blink/nod/lipsync, then export Unity WebGL to `apps/web/public/unity/<scene-name>/`.
+3. Update each avatar's `unitySceneUrl` and `makeHumanModelId` in `apps/server/src/avatarCatalog.ts`.
+4. Keep thumbnails in `apps/web/public/avatars/<avatar-id>.svg|png|jpg`.
+5. Ensure your Unity runtime listens for `window.postMessage` events with `type: "neurofang-stage-state"`.
 
 ## Web interviewer behavior
 
-`apps/web` renders the selected interviewer through a Synthesia embed and overlays realtime voice-activity level from the OpenAI remote audio stream.
+`apps/web` renders the selected interviewer via a Unity stage URL and overlays realtime voice-activity level from the OpenAI remote audio stream.
 
 ## Optional modules scaffold
 

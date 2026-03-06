@@ -102,9 +102,9 @@ export default function App() {
       <View style={{ height: 12 }} />
       <Button title="Disconnect" onPress={disconnect} disabled={status === 'idle'} />
       <View style={{ marginTop: 24, padding: 12, borderColor: '#334155', borderWidth: 1, borderRadius: 8 }}>
-        <Text style={{ color: '#e2e8f0' }}>Synthesia interviewer placeholder</Text>
+        <Text style={{ color: '#e2e8f0' }}>MakeHuman + Unity interviewer placeholder</Text>
         <Text style={{ color: '#94a3b8', marginTop: 8 }}>
-          For production mobile rendering, open the selected Synthesia embed URL in a WebView and mirror the same avatar selection used on web.
+          For production mobile rendering, load the selected Unity scene URL in a WebView and send stage-state messages (speech/listening) to drive MakeHuman rig animations.
         </Text>
       </View>
     </SafeAreaView>

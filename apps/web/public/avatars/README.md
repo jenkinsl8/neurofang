@@ -1,13 +1,14 @@
 # Avatar assets
 
-- `ava-01.svg` ... `ava-16.svg`: local fallback interviewer thumbnails.
-- `placeholder.svg`: generic fallback used when a thumbnail is unavailable.
+This folder contains local avatar thumbnails used by both web and server fallbacks.
 
-Runtime-generated Synthesia thumbnails:
-- The server endpoint `GET /api/avatars/:avatarId/thumbnail` downloads the configured Synthesia interviewer thumbnail (`synthesiaThumbnailUrl`) and caches it to `apps/server/data/generated-avatars`.
-- If download fails, the API falls back to `placeholder.svg`.
+- Keep one image per avatar ID, e.g. `ava-01.svg`, `ava-02.svg`, etc.
+- The server endpoint `GET /api/avatars/:avatarId/thumbnail` serves these local files first.
+- If an avatar image is missing, the API falls back to `placeholder.svg`.
 
-To replace interviewers:
-1. Create or select interviewers in Synthesia (free tier is supported).
-2. Update `apps/server/src/avatarCatalog.ts` with each interviewer's `synthesiaAvatarId`, `synthesiaEmbedUrl`, and `synthesiaThumbnailUrl`.
-3. Restart the server and open the avatar picker; thumbnails will be generated and cached automatically.
+## Using MakeHuman + Unity assets
+
+1. Create/export pre-rigged MakeHuman interviewers and import to Unity.
+2. Build Unity WebGL scenes and publish them under `apps/web/public/unity/...`.
+3. Update `apps/server/src/avatarCatalog.ts` with each avatar's `makeHumanModelId` and `unitySceneUrl`.
+4. Add/update each avatar thumbnail file in this folder.

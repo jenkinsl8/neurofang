@@ -1,24 +1,33 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type Props = {
-  synthesiaEmbedUrl: string;
+  unitySceneUrl: string;
   thumbnailPath: string;
   remoteStream?: MediaStream | null;
   resetSignal?: number;
 };
 
+type UnityStageMessage = {
+  type: 'neurofang-stage-state';
+  payload: {
+    speechLevel: number;
+    isSpeaking: boolean;
+    isListening: boolean;
+  };
+};
+
 const FALLBACK_THUMBNAIL = '/avatars/placeholder.svg';
 
-export function AvatarStage({ synthesiaEmbedUrl, thumbnailPath, remoteStream, resetSignal = 0 }: Props) {
+export function AvatarStage({ unitySceneUrl, thumbnailPath, remoteStream, resetSignal = 0 }: Props) {
   const [imageSrc, setImageSrc] = useState(thumbnailPath || FALLBACK_THUMBNAIL);
   const [speechLevel, setSpeechLevel] = useState(0);
   const [hasEmbedError, setHasEmbedError] = useState(false);
   const iframeKeyRef = useRef(0);
-  const embedUrl = synthesiaEmbedUrl.trim();
-  const hasEmbedUrl = embedUrl.length > 0;
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const sceneUrl = unitySceneUrl.trim();
+  const hasSceneUrl = sceneUrl.length > 0;
 
   useEffect(() => {
     setImageSrc(thumbnailPath || FALLBACK_THUMBNAIL);
@@ -27,7 +36,7 @@ export function AvatarStage({ synthesiaEmbedUrl, thumbnailPath, remoteStream, re
   useEffect(() => {
     iframeKeyRef.current += 1;
     setHasEmbedError(false);
-  }, [synthesiaEmbedUrl, resetSignal]);
+  }, [unitySceneUrl, resetSignal]);
 
   useEffect(() => {
     if (!remoteStream) {
@@ -74,25 +83,43 @@ export function AvatarStage({ synthesiaEmbedUrl, thumbnailPath, remoteStream, re
     };
   }, [remoteStream, resetSignal]);
 
+  useEffect(() => {
+    if (!iframeRef.current?.contentWindow) {
+      return;
+    }
+
+    const message: UnityStageMessage = {
+      type: 'neurofang-stage-state',
+      payload: {
+        speechLevel,
+        isSpeaking: speechLevel > 0.12,
+        isListening: speechLevel <= 0.12
+      }
+    };
+
+    iframeRef.current.contentWindow.postMessage(message, '*');
+  }, [speechLevel]);
+
   return (
     <div className="stage-canvas-wrap" style={{ width: '100%' }}>
-      {!hasEmbedError && hasEmbedUrl ? (
+      {!hasEmbedError && hasSceneUrl ? (
         <iframe
+          ref={iframeRef}
           key={iframeKeyRef.current}
-          src={embedUrl}
+          src={sceneUrl}
           style={{ width: '100%', height: 560, borderRadius: 12, overflow: 'hidden', border: '1px solid #2b3f59' }}
           allow="autoplay; fullscreen"
-          title="Synthesia interviewer"
+          title="MakeHuman Unity interviewer"
           onError={() => setHasEmbedError(true)}
         />
       ) : null}
-      {hasEmbedError || !hasEmbedUrl ? (
+      {hasEmbedError || !hasSceneUrl ? (
         <div className="stage-fallback">
           <img src={imageSrc} alt="Interviewer preview" className="stage-fallback-image" onError={() => setImageSrc(FALLBACK_THUMBNAIL)} />
           <p>
-            {hasEmbedUrl
-              ? 'Synthesia embed could not load. Using generated thumbnail fallback.'
-              : 'Synthesia embed URL is unavailable. Using generated thumbnail fallback.'}
+            {hasSceneUrl
+              ? 'Unity interviewer scene could not load. Using generated thumbnail fallback.'
+              : 'Unity interviewer scene URL is unavailable. Using generated thumbnail fallback.'}
           </p>
         </div>
       ) : null}
