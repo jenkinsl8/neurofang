@@ -19,7 +19,6 @@ const PORT = Number(process.env.PORT ?? 8787);
 
 const allowedDifficulties: InterviewDifficulty[] = ['friendly', 'neutral', 'tough'];
 const allowedPersonalities: InterviewPersonality[] = ['friendly', 'analytical', 'skeptical', 'executive'];
-const generatedAvatarDirectory = path.resolve(process.cwd(), 'apps/server/data/generated-avatars');
 
 function normalizeDifficulty(value: unknown): InterviewDifficulty {
   return allowedDifficulties.includes(value as InterviewDifficulty) ? (value as InterviewDifficulty) : 'neutral';
@@ -32,7 +31,6 @@ function normalizePersonality(value: unknown): InterviewPersonality {
 }
 
 loadRecentAvatars();
-fs.mkdirSync(generatedAvatarDirectory, { recursive: true });
 
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
@@ -75,19 +73,7 @@ async function generateAvatarThumbnail(avatarId: string) {
     }
   }
 
-  const outputPath = path.join(generatedAvatarDirectory, `${avatar.id}.jpg`);
-  if (fs.existsSync(outputPath)) {
-    return outputPath;
-  }
-
-  const response = await fetch(avatar.synthesiaThumbnailUrl);
-  if (!response.ok) {
-    throw new Error(`Synthesia thumbnail download failed: ${response.status} ${await response.text()}`);
-  }
-
-  const imageData = Buffer.from(await response.arrayBuffer());
-  fs.writeFileSync(outputPath, imageData);
-  return outputPath;
+  return null;
 }
 
 app.get('/api/avatars/:avatarId/thumbnail', async (req, res) => {

@@ -224,7 +224,7 @@ export default function Page() {
       </div>
 
       <div className="card">
-        <h3>Synthesia interviewer picker</h3>
+        <h3>MakeHuman + Unity interviewer picker</h3>
         <div className="avatar-grid">
           <button className="avatar-tile" onClick={() => void pickRandomAvatar()}>
             <strong>Pick for me</strong>
@@ -262,7 +262,7 @@ export default function Page() {
           </div>
         </div>
         <AvatarStage
-          synthesiaEmbedUrl={selectedAvatar?.synthesiaEmbedUrl ?? ""}
+          unitySceneUrl={resolveAssetUrl(selectedAvatar?.unitySceneUrl)}
           thumbnailPath={resolveAssetUrl(selectedAvatar?.thumbnailPath)}
           remoteStream={remoteStream}
           resetSignal={stageResetSignal}

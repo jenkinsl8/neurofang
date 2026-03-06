@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Neurofang Unity Stage Mock</title>
+    <style>
+      body {
+        margin: 0;
+        background: radial-gradient(circle at 20% 20%, #1f2937, #020617 72%);
+        color: #e2e8f0;
+        font-family: Inter, system-ui, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100vw;
+        height: 100vh;
+      }
+      .avatar {
+        width: 320px;
+        height: 420px;
+        border: 1px solid #334155;
+        border-radius: 24px;
+        background: linear-gradient(160deg, rgba(30, 41, 59, .95), rgba(15, 23, 42, .9));
+        box-shadow: 0 14px 40px rgba(15, 23, 42, .6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        transform-origin: center 20%;
+        transition: transform 120ms linear;
+      }
+      .face {
+        font-size: 84px;
+      }
+      .meta { font-size: 13px; color: #93c5fd; }
+      .state { font-size: 12px; margin-top: 8px; color: #cbd5e1; }
+    </style>
+  </head>
+  <body>
+    <div id="avatar" class="avatar">
+      <div class="face">🧑‍💼</div>
+      <div class="meta" id="avatarName">MakeHuman interviewer</div>
+      <div class="state" id="state">idle / listening</div>
+    </div>
+    <script>
+      const avatar = document.getElementById('avatar');
+      const nameNode = document.getElementById('avatarName');
+      const stateNode = document.getElementById('state');
+      const params = new URLSearchParams(window.location.search);
+      nameNode.textContent = `MakeHuman rig: ${params.get('avatar') ?? 'default'}`;
+
+      window.addEventListener('message', (event) => {
+        const message = event.data;
+        if (!message || message.type !== 'neurofang-stage-state') {
+          return;
+        }
+
+        const { speechLevel, isSpeaking, isListening } = message.payload ?? {};
+        const clamped = Math.max(0, Math.min(1, Number(speechLevel) || 0));
+        const nod = Math.sin(Date.now() / 140) * clamped * 8;
+        avatar.style.transform = `translateY(${clamped * -4}px) rotate(${nod}deg)`;
+        stateNode.textContent = `${isSpeaking ? 'speaking' : 'idle'} / ${isListening ? 'listening' : 'processing'} / ${(clamped * 100).toFixed(0)}%`;
+      });
+    </script>
+  </body>
+</html>

@@ -18,9 +18,8 @@ export type AvatarCatalogEntry = {
   name: string;
   gender: AvatarGender;
   raceGroup: AvatarRaceGroup;
-  synthesiaAvatarId: string;
-  synthesiaEmbedUrl: string;
-  synthesiaThumbnailUrl: string;
+  makeHumanModelId: string;
+  unitySceneUrl: string;
   thumbnailPath: string;
 };
 
