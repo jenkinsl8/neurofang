@@ -168,8 +168,8 @@ app.post('/session', async (req, res) => {
     `Intake: ${JSON.stringify(intake ?? {})}`
   ].join(' ');
 
-  const createSessionPayload = (includeModalities: boolean) => {
-    const sessionPayload: Record<string, unknown> = {
+  const createSessionPayload = () => {
+    return {
       type: 'realtime',
       model: realtimeModel,
       audio: {
@@ -186,12 +186,6 @@ app.post('/session', async (req, res) => {
       },
       instructions: sessionInstructions
     };
-
-    if (includeModalities) {
-      sessionPayload.modalities = ['audio', 'text'];
-    }
-
-    return sessionPayload;
   };
 
   const callOpenAiRealtime = async (sessionPayload: Record<string, unknown>) => {
@@ -217,39 +211,10 @@ app.post('/session', async (req, res) => {
       sdpLength: body.sdp.length
     });
 
-    const primarySessionPayload = createSessionPayload(true);
-    let response = await callOpenAiRealtime(primarySessionPayload);
-    let failureBody = '';
+    const response = await callOpenAiRealtime(createSessionPayload());
 
     if (!response.ok) {
-      failureBody = await response.text();
-      let errorPayload: { error?: { param?: string; code?: string; message?: string } } | null = null;
-
-      try {
-        errorPayload = JSON.parse(failureBody) as { error?: { param?: string; code?: string; message?: string } };
-      } catch {
-        errorPayload = null;
-      }
-
-      const errorDetails = errorPayload?.error;
-      const unsupportedModalities =
-        response.status === 400 &&
-        errorDetails?.code === 'unknown_parameter' &&
-        errorDetails.param === 'session.modalities';
-
-      if (unsupportedModalities) {
-        traceWebRtc('openai:request:retry-without-modalities', {
-          status: response.status,
-          param: errorDetails?.param,
-          code: errorDetails?.code,
-          message: errorDetails?.message
-        });
-        response = await callOpenAiRealtime(createSessionPayload(false));
-      }
-    }
-
-    if (!response.ok) {
-      const text = failureBody || (await response.text());
+      const text = await response.text();
       traceWebRtc('openai:request:failure', {
         status: response.status,
         bodyLength: text.length,
