@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, SafeAreaView, Text, View } from 'react-native';
 import { mediaDevices, RTCPeerConnection } from 'react-native-webrtc';
-import type { AvatarCatalogEntry, InterviewIntake } from '@dominion/shared';
+import { defaultRealtimeIceServers, type AvatarCatalogEntry, type InterviewIntake } from '@dominion/shared';
 
 const SERVER_URL = process.env.EXPO_PUBLIC_SERVER_URL ?? 'http://192.168.1.100:8787';
 
@@ -43,6 +43,71 @@ async function waitForIceGatheringComplete(peer: RTCPeerConnection) {
   });
 }
 
+async function exchangeSessionSdp(
+  peer: RTCPeerConnection,
+  options: {
+    intake: InterviewIntake;
+    avatarId: string | undefined;
+    reason: 'initial' | 'ice-restart';
+  }
+) {
+  traceWebRtc('signaling:exchange:start', {
+    reason: options.reason,
+    signalingState: peer.signalingState,
+    connectionState: peer.connectionState,
+    iceConnectionState: peer.iceConnectionState,
+    iceGatheringState: peer.iceGatheringState
+  });
+
+  const offer = await peer.createOffer(options.reason === 'ice-restart' ? { iceRestart: true } : undefined);
+  traceWebRtc('signaling:offer:created', { reason: options.reason, sdpLength: offer.sdp?.length ?? 0 });
+
+  await peer.setLocalDescription(offer);
+  traceWebRtc('signaling:offer:set-local-description', {
+    reason: options.reason,
+    signalingState: peer.signalingState,
+    iceGatheringState: peer.iceGatheringState
+  });
+
+  traceWebRtc('signaling:ice-gathering:wait:start', { reason: options.reason });
+  await waitForIceGatheringComplete(peer);
+  traceWebRtc('signaling:ice-gathering:wait:done', {
+    reason: options.reason,
+    iceGatheringState: peer.iceGatheringState
+  });
+
+  const localSdp = peer.localDescription?.sdp;
+  traceWebRtc('signaling:offer:ready', { reason: options.reason, sdpLength: localSdp?.length ?? 0 });
+  if (!localSdp) {
+    throw new Error(`Missing local SDP for ${options.reason}`);
+  }
+
+  traceWebRtc('session:request:start', { reason: options.reason, url: `${SERVER_URL}/session` });
+  const res = await fetch(`${SERVER_URL}/session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sdp: localSdp, avatarId: options.avatarId, intake: options.intake })
+  });
+  traceWebRtc('session:request:response', { reason: options.reason, status: res.status, ok: res.ok });
+
+  if (!res.ok) {
+    const payload = (await res.json().catch(() => ({ error: 'Unknown server error' }))) as { error?: string };
+    traceWebRtc('session:request:failure', { reason: options.reason, error: payload.error ?? null });
+    throw new Error(payload.error ?? `Session setup failed: ${res.status}`);
+  }
+
+  const { answerSdp } = (await res.json()) as { answerSdp: string };
+  traceWebRtc('session:request:success', { reason: options.reason, answerSdpLength: answerSdp.length });
+
+  await peer.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+  traceWebRtc('signaling:answer:set-remote-description', {
+    reason: options.reason,
+    signalingState: peer.signalingState,
+    connectionState: peer.connectionState,
+    iceConnectionState: peer.iceConnectionState
+  });
+}
+
 export default function App() {
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -79,15 +144,36 @@ export default function App() {
       setError('');
       setStatus('connecting');
       traceWebRtc('connect:start', { avatarId: avatar?.id });
-      const peer = new RTCPeerConnection();
+      const peer = new RTCPeerConnection({ iceServers: [...defaultRealtimeIceServers] });
       peerRef.current = peer;
 
       peer.addEventListener('icegatheringstatechange', () => {
         traceWebRtc('ice:gathering-state-change', { state: peer.iceGatheringState });
       });
 
+      let hasRetriedIceRecovery = false;
       peer.addEventListener('iceconnectionstatechange', () => {
-        traceWebRtc('ice:connection-state-change', { state: peer.iceConnectionState });
+        const state = peer.iceConnectionState;
+        traceWebRtc('ice:connection-state-change', { state });
+
+        if ((state === 'disconnected' || state === 'failed') && !hasRetriedIceRecovery) {
+          hasRetriedIceRecovery = true;
+          traceWebRtc('ice:recovery:restart-requested', { state });
+          void (async () => {
+            try {
+              await exchangeSessionSdp(peer, {
+                reason: 'ice-restart',
+                avatarId: avatar?.id,
+                intake: defaultIntake
+              });
+              traceWebRtc('ice:recovery:restart-succeeded');
+            } catch (iceRecoveryError) {
+              traceWebRtc('ice:recovery:restart-failed', {
+                message: iceRecoveryError instanceof Error ? iceRecoveryError.message : 'Unknown error'
+              });
+            }
+          })();
+        }
       });
 
       peer.addEventListener('connectionstatechange', () => {
@@ -102,35 +188,11 @@ export default function App() {
       localStreamRef.current = stream;
       stream.getTracks().forEach((track) => peer.addTrack(track, stream));
 
-      const offer = await peer.createOffer();
-      await peer.setLocalDescription(offer);
-      traceWebRtc('peer:set-local-description', { sdpLength: offer.sdp?.length ?? 0 });
-      await waitForIceGatheringComplete(peer);
-
-      const localSdp = peer.localDescription?.sdp;
-      traceWebRtc('peer:local-description-ready', { sdpLength: localSdp?.length ?? 0 });
-      if (!localSdp) {
-        throw new Error('Missing local SDP after ICE gathering');
-      }
-
-      traceWebRtc('session:request:start', { url: `${SERVER_URL}/session` });
-      const res = await fetch(`${SERVER_URL}/session`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sdp: localSdp, avatarId: avatar?.id, intake: defaultIntake })
+      await exchangeSessionSdp(peer, {
+        reason: 'initial',
+        avatarId: avatar?.id,
+        intake: defaultIntake
       });
-
-      if (!res.ok) {
-        const payload = (await res.json().catch(() => ({ error: 'Unknown server error' }))) as {
-          error?: string;
-        };
-        throw new Error(payload.error ?? `Failed to connect: ${res.status}`);
-      }
-
-      const { answerSdp } = (await res.json()) as { answerSdp: string };
-      traceWebRtc('session:request:success', { answerSdpLength: answerSdp.length });
-      await peer.setRemoteDescription({ type: 'answer', sdp: answerSdp });
-      traceWebRtc('peer:set-remote-description');
       setStatus('connected');
       traceWebRtc('connect:completed');
     } catch (nextError) {
