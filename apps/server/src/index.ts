@@ -153,41 +153,60 @@ app.post('/session', async (req, res) => {
           ? '11'
           : '14';
 
-  const form = new FormData();
-  form.append('sdp', body.sdp);
-  form.append(
-    'session',
-    JSON.stringify({
+  const sessionInstructions = [
+    'You are Dominion, a business-professional mock interviewer for technical interviews.',
+    'Speak in English by default unless the candidate explicitly asks to switch languages.',
+    `Use a ${difficultyLabel} interview difficulty and a ${personalityLabel} interviewer personality.`,
+    'Stay respectful, concise, and realistic. Ask one question at a time and wait for the answer.',
+    selectedAvatar
+      ? `Interviewer profile: ${selectedAvatar.name}, ${selectedAvatar.gender}, ${selectedAvatar.raceGroup}.`
+      : 'Interviewer profile: use a neutral professional tone.',
+    `At the start of the call, immediately deliver a warm spoken introduction as the interviewer: introduce yourself by name, state your role as ${roleAtCompany}, and mention that you have ${yearsExperience} years of experience.`,
+    'Then briefly explain the company mission, the department, and the key team members the candidate would collaborate with.',
+    'Then explain the open role being interviewed for, including major responsibilities and expectations.',
+    'After this introduction, begin the interview immediately by asking the first relevant interview question.',
+    `Intake: ${JSON.stringify(intake ?? {})}`
+  ].join(' ');
+
+  const createSessionPayload = (includeModalities: boolean) => {
+    const sessionPayload: Record<string, unknown> = {
       type: 'realtime',
       model: realtimeModel,
-      modalities: ['audio', 'text'],
       audio: {
         input: {
           turn_detection: {
             type: 'server_vad',
-            create_response: true
+            create_response: true,
+            interrupt_response: true
           }
         },
         output: {
           voice: realtimeVoice
         }
       },
-      instructions: [
-        'You are Dominion, a business-professional mock interviewer for technical interviews.',
-        'Speak in English by default unless the candidate explicitly asks to switch languages.',
-        `Use a ${difficultyLabel} interview difficulty and a ${personalityLabel} interviewer personality.`,
-        'Stay respectful, concise, and realistic. Ask one question at a time and wait for the answer.',
-        selectedAvatar
-          ? `Interviewer profile: ${selectedAvatar.name}, ${selectedAvatar.gender}, ${selectedAvatar.raceGroup}.`
-          : 'Interviewer profile: use a neutral professional tone.',
-        `At the start of the call, immediately deliver a warm spoken introduction as the interviewer: introduce yourself by name, state your role as ${roleAtCompany}, and mention that you have ${yearsExperience} years of experience.`,
-        'Then briefly explain the company mission, the department, and the key team members the candidate would collaborate with.',
-        'Then explain the open role being interviewed for, including major responsibilities and expectations.',
-        'After this introduction, begin the interview immediately by asking the first relevant interview question.',
-        `Intake: ${JSON.stringify(intake ?? {})}`
-      ].join(' ')
-    })
-  );
+      instructions: sessionInstructions
+    };
+
+    if (includeModalities) {
+      sessionPayload.modalities = ['audio', 'text'];
+    }
+
+    return sessionPayload;
+  };
+
+  const callOpenAiRealtime = async (sessionPayload: Record<string, unknown>) => {
+    const form = new FormData();
+    form.append('sdp', body.sdp);
+    form.append('session', JSON.stringify(sessionPayload));
+
+    return fetch('https://api.openai.com/v1/realtime/calls', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: form
+    });
+  };
 
   try {
     traceWebRtc('openai:request:start', {
@@ -198,16 +217,39 @@ app.post('/session', async (req, res) => {
       sdpLength: body.sdp.length
     });
 
-    const response = await fetch('https://api.openai.com/v1/realtime/calls', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: form
-    });
+    const primarySessionPayload = createSessionPayload(true);
+    let response = await callOpenAiRealtime(primarySessionPayload);
+    let failureBody = '';
 
     if (!response.ok) {
-      const text = await response.text();
+      failureBody = await response.text();
+      let errorPayload: { error?: { param?: string; code?: string; message?: string } } | null = null;
+
+      try {
+        errorPayload = JSON.parse(failureBody) as { error?: { param?: string; code?: string; message?: string } };
+      } catch {
+        errorPayload = null;
+      }
+
+      const errorDetails = errorPayload?.error;
+      const unsupportedModalities =
+        response.status === 400 &&
+        errorDetails?.code === 'unknown_parameter' &&
+        errorDetails.param === 'session.modalities';
+
+      if (unsupportedModalities) {
+        traceWebRtc('openai:request:retry-without-modalities', {
+          status: response.status,
+          param: errorDetails?.param,
+          code: errorDetails?.code,
+          message: errorDetails?.message
+        });
+        response = await callOpenAiRealtime(createSessionPayload(false));
+      }
+    }
+
+    if (!response.ok) {
+      const text = failureBody || (await response.text());
       traceWebRtc('openai:request:failure', {
         status: response.status,
         bodyLength: text.length,
