@@ -820,9 +820,7 @@ export default function Page() {
 
         const kickoffResponseEvent = {
           type: 'response.create',
-          response: {
-            modalities: ['audio', 'text']
-          }
+          response: {}
         };
 
         traceWebRtc('kickoff:conversation-item:create:send', kickoffConversationEvent);
