@@ -20,8 +20,23 @@ type UnityStageMessage = {
 
 const FALLBACK_THUMBNAIL = '/avatars/placeholder.svg';
 
+export function resolveStageImageSrc(thumbnailPath?: string) {
+  return thumbnailPath?.trim() ? thumbnailPath : FALLBACK_THUMBNAIL;
+}
+
+export function buildUnityStageMessage(speechLevel: number): UnityStageMessage {
+  return {
+    type: 'neurofang-stage-state',
+    payload: {
+      speechLevel,
+      isSpeaking: speechLevel > 0.12,
+      isListening: speechLevel <= 0.12
+    }
+  };
+}
+
 export function AvatarStage({ unitySceneUrl, thumbnailPath, remoteStream, resetSignal = 0 }: Props) {
-  const [imageSrc, setImageSrc] = useState(thumbnailPath || FALLBACK_THUMBNAIL);
+  const [imageSrc, setImageSrc] = useState(resolveStageImageSrc(thumbnailPath));
   const [speechLevel, setSpeechLevel] = useState(0);
   const [hasEmbedError, setHasEmbedError] = useState(false);
   const iframeKeyRef = useRef(0);
@@ -30,7 +45,7 @@ export function AvatarStage({ unitySceneUrl, thumbnailPath, remoteStream, resetS
   const hasSceneUrl = sceneUrl.length > 0;
 
   useEffect(() => {
-    setImageSrc(thumbnailPath || FALLBACK_THUMBNAIL);
+    setImageSrc(resolveStageImageSrc(thumbnailPath));
   }, [thumbnailPath]);
 
   useEffect(() => {
@@ -88,14 +103,7 @@ export function AvatarStage({ unitySceneUrl, thumbnailPath, remoteStream, resetS
       return;
     }
 
-    const message: UnityStageMessage = {
-      type: 'neurofang-stage-state',
-      payload: {
-        speechLevel,
-        isSpeaking: speechLevel > 0.12,
-        isListening: speechLevel <= 0.12
-      }
-    };
+    const message = buildUnityStageMessage(speechLevel);
 
     iframeRef.current.contentWindow.postMessage(message, '*');
   }, [speechLevel]);
@@ -115,7 +123,7 @@ export function AvatarStage({ unitySceneUrl, thumbnailPath, remoteStream, resetS
       ) : null}
       {hasEmbedError || !hasSceneUrl ? (
         <div className="stage-fallback">
-          <img src={imageSrc} alt="Interviewer preview" className="stage-fallback-image" onError={() => setImageSrc(FALLBACK_THUMBNAIL)} />
+          <img src={imageSrc} alt="Interviewer preview" className="stage-fallback-image" onError={() => setImageSrc(resolveStageImageSrc())} />
           <p>
             {hasSceneUrl
               ? 'Unity interviewer scene could not load. Using generated thumbnail fallback.'
