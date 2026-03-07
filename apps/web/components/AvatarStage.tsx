@@ -39,15 +39,15 @@ function resolveInterviewerStatus(
 
   const hasRemoteAudio = Boolean(remoteStream?.getAudioTracks().some((track) => track.readyState === 'live'));
 
-  if (remoteSpeechLevel > SPEAKING_THRESHOLD || !hasRemoteAudio) {
+  if (remoteSpeechLevel > SPEAKING_THRESHOLD) {
     return 'active/talking';
   }
 
-  if (localSpeechLevel > SPEAKING_THRESHOLD) {
+  if (localSpeechLevel > SPEAKING_THRESHOLD || !hasRemoteAudio) {
     return 'active/listening';
   }
 
-  return 'active/talking';
+  return 'active/listening';
 }
 
 export function resolveStageImageSrc(thumbnailPath?: string) {
