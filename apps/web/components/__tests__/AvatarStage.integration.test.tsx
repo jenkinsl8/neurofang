@@ -60,7 +60,7 @@ describe('AvatarStage integration', () => {
     );
 
     expect(onInterviewerStatusChange).toHaveBeenCalledTimes(2);
-    expect(onInterviewerStatusChange).toHaveBeenLastCalledWith('active/talking');
+    expect(onInterviewerStatusChange).toHaveBeenLastCalledWith('active/listening');
   });
 
   it('falls back to thumbnail when the 3d scene url is missing and keeps a safe image fallback', () => {

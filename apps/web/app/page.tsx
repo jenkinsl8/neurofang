@@ -42,6 +42,9 @@ function pickPayloadFields(
 
 function shouldTraceRealtimePayload(type: string) {
   return (
+    type === 'error' ||
+    type === 'session.updated' ||
+    type === 'response.create' ||
     type === 'response.created' ||
     type === 'response.done' ||
     type === 'response.output_audio.started' ||
@@ -616,6 +619,31 @@ export default function Page() {
             });
           }
 
+          if (type === 'error') {
+            const errorPayload = asRecord(parsed.error) ?? parsed;
+            traceWebRtc('datachannel:event:error-diagnostic', {
+              code: toText(errorPayload.code) ?? 'unknown-error-code',
+              message: toText(errorPayload.message) ?? 'unknown-error-message',
+              full: parsed
+            });
+          }
+
+          if (type === 'session.updated') {
+            const session = asRecord(parsed.session);
+            const outputAudioFormat = session ? toText(session.output_audio_format) : null;
+            const audio = session ? asRecord(session.audio) : null;
+            const output = audio ? asRecord(audio.output) : null;
+            const outputFormat = output ? toText(output.format) : null;
+            const voice = output ? toText(output.voice) : null;
+
+            traceWebRtc('datachannel:event:session-updated', {
+              outputAudioFormat,
+              audioOutputFormat: outputFormat,
+              audioOutputVoice: voice,
+              full: parsed
+            });
+          }
+
           if (
             type.startsWith('input_audio_') ||
             type.startsWith('conversation.item.input_audio_')
@@ -653,6 +681,13 @@ export default function Page() {
 
           if (type === 'response.created' || type === 'response.create') {
             setInterviewerStatus('thinking');
+            if (type === 'response.created') {
+              traceWebRtc('kickoff:response-create:accepted', {
+                responseId: toText(asRecord(parsed.response)?.id),
+                status: toText(asRecord(parsed.response)?.status),
+                full: parsed
+              });
+            }
             return;
           }
 
@@ -730,7 +765,7 @@ export default function Page() {
       };
       controlChannel.onopen = () => {
         traceWebRtc('datachannel:open');
-        setInterviewerStatus('thinking');
+        setInterviewerStatus('listening');
         const kickoffEvent = {
           type: 'response.create',
           response: {
@@ -740,6 +775,7 @@ export default function Page() {
           }
         };
 
+        traceWebRtc('kickoff:response-create:send', kickoffEvent);
         controlChannel.send(JSON.stringify(kickoffEvent));
       };
 
