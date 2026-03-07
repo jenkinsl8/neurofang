@@ -9,6 +9,7 @@ type Props = {
   remoteStream?: MediaStream | null;
   localStream?: MediaStream | null;
   resetSignal?: number;
+  sessionStatus?: 'idle' | 'connecting' | 'connected';
 };
 
 type UnityStageMessage = {
@@ -23,18 +24,27 @@ type UnityStageMessage = {
 const FALLBACK_THUMBNAIL = '/avatars/placeholder.svg';
 const SPEAKING_THRESHOLD = 0.12;
 
-function resolveInterviewerStatus(remoteSpeechLevel: number, remoteStream?: MediaStream | null) {
+function resolveInterviewerStatus(
+  remoteSpeechLevel: number,
+  remoteStream: MediaStream | null | undefined,
+  localSpeechLevel: number,
+  sessionStatus: Props['sessionStatus']
+) {
+  if (sessionStatus !== 'connected') {
+    return 'idle/listening';
+  }
+
   const hasRemoteAudio = Boolean(remoteStream?.getAudioTracks().some((track) => track.readyState === 'live'));
 
-  if (!hasRemoteAudio) {
-    return 'idle';
+  if (remoteSpeechLevel > SPEAKING_THRESHOLD || !hasRemoteAudio) {
+    return 'active/talking';
   }
 
-  if (remoteSpeechLevel > SPEAKING_THRESHOLD) {
-    return 'speaking';
+  if (localSpeechLevel > SPEAKING_THRESHOLD) {
+    return 'active/listening';
   }
 
-  return 'processing';
+  return 'active/talking';
 }
 
 export function resolveStageImageSrc(thumbnailPath?: string) {
@@ -105,7 +115,14 @@ function useSpeechLevel(stream: MediaStream | null | undefined, resetSignal: num
   return speechLevel;
 }
 
-export function AvatarStage({ unitySceneUrl, thumbnailPath, remoteStream, localStream, resetSignal = 0 }: Props) {
+export function AvatarStage({
+  unitySceneUrl,
+  thumbnailPath,
+  remoteStream,
+  localStream,
+  resetSignal = 0,
+  sessionStatus = 'idle'
+}: Props) {
   const [imageSrc, setImageSrc] = useState(resolveStageImageSrc(thumbnailPath));
   const [hasEmbedError, setHasEmbedError] = useState(false);
   const iframeKeyRef = useRef(0);
@@ -114,7 +131,12 @@ export function AvatarStage({ unitySceneUrl, thumbnailPath, remoteStream, localS
   const hasSceneUrl = sceneUrl.length > 0;
   const remoteSpeechLevel = useSpeechLevel(remoteStream, resetSignal);
   const localSpeechLevel = useSpeechLevel(localStream, resetSignal);
-  const interviewerStatus = resolveInterviewerStatus(remoteSpeechLevel, remoteStream);
+  const interviewerStatus = resolveInterviewerStatus(
+    remoteSpeechLevel,
+    remoteStream,
+    localSpeechLevel,
+    sessionStatus
+  );
 
   useEffect(() => {
     setImageSrc(resolveStageImageSrc(thumbnailPath));
