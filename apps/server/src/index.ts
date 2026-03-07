@@ -160,6 +160,7 @@ app.post('/session', async (req, res) => {
     JSON.stringify({
       type: 'realtime',
       model: realtimeModel,
+      modalities: ['audio', 'text'],
       audio: {
         input: {
           turn_detection: {
