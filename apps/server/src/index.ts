@@ -128,6 +128,12 @@ app.post('/session', async (req, res) => {
       type: 'realtime',
       model: process.env.OPENAI_REALTIME_MODEL ?? 'gpt-4o-realtime-preview',
       audio: {
+        input: {
+          turn_detection: {
+            type: 'server_vad',
+            create_response: true
+          }
+        },
         output: {
           voice: process.env.OPENAI_REALTIME_VOICE ?? 'alloy'
         }
