@@ -35,6 +35,34 @@ describe('AvatarStage integration', () => {
     });
   });
 
+
+  it('notifies interviewer status changes when the derived status updates', () => {
+    const onInterviewerStatusChange = vi.fn();
+    const { rerender } = render(
+      <AvatarStage
+        unitySceneUrl="https://example.com/unity/interviewer"
+        thumbnailPath="/avatars/ava-01.svg"
+        sessionStatus="idle"
+        onInterviewerStatusChange={onInterviewerStatusChange}
+      />
+    );
+
+    expect(onInterviewerStatusChange).toHaveBeenCalledTimes(1);
+    expect(onInterviewerStatusChange).toHaveBeenLastCalledWith('idle/listening');
+
+    rerender(
+      <AvatarStage
+        unitySceneUrl="https://example.com/unity/interviewer"
+        thumbnailPath="/avatars/ava-01.svg"
+        sessionStatus="connected"
+        onInterviewerStatusChange={onInterviewerStatusChange}
+      />
+    );
+
+    expect(onInterviewerStatusChange).toHaveBeenCalledTimes(2);
+    expect(onInterviewerStatusChange).toHaveBeenLastCalledWith('active/talking');
+  });
+
   it('falls back to thumbnail when the 3d scene url is missing and keeps a safe image fallback', () => {
     render(<AvatarStage unitySceneUrl="   " thumbnailPath="/avatars/ava-02.svg" />);
 

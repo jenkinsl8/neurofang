@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AvatarCatalogEntry, InterviewIntake } from '@dominion/shared';
 
 const AvatarStage = dynamic(
@@ -46,6 +46,22 @@ function findTranscript(event: Record<string, unknown>): string | null {
   const directTranscript = toText(event.transcript) ?? toText(event.delta) ?? toText(event.text);
   if (directTranscript) {
     return directTranscript;
+  }
+
+  const rootContent = event.content;
+  if (Array.isArray(rootContent)) {
+    for (const entry of rootContent) {
+      const contentEntry = asRecord(entry);
+      if (!contentEntry) {
+        continue;
+      }
+
+      const contentTranscript =
+        toText(contentEntry.transcript) ?? toText(contentEntry.text) ?? toText(contentEntry.delta);
+      if (contentTranscript) {
+        return contentTranscript;
+      }
+    }
   }
 
   const item = asRecord(event.item);
@@ -175,6 +191,15 @@ export default function Page() {
     () => avatars.find((avatar) => avatar.id === avatarId) ?? avatars[0],
     [avatars, avatarId]
   );
+
+
+  const handleInterviewerStatusChange = useCallback(
+    (interviewerStatus: string) => {
+      traceWebRtc('interviewer:status:changed', { interviewerStatus });
+    },
+    []
+  );
+
 
   async function pickRandomAvatar(currentId = avatarId) {
     const res = await fetch(`${SERVER_URL}/api/avatars/pick`, {
@@ -353,6 +378,18 @@ export default function Page() {
             return;
           }
 
+          const candidateDeltaTypes = new Set([
+            'input_audio_transcription.partial',
+            'input_audio_transcription.delta',
+            'conversation.item.input_audio_transcription.partial',
+            'conversation.item.input_audio_transcription.delta'
+          ]);
+
+          const candidateFinalTypes = new Set([
+            'conversation.item.input_audio_transcription.completed',
+            'input_audio_transcription.completed'
+          ]);
+
           if (type === 'input_audio_buffer.speech_started') {
             userTranscriptBufferRef.current = '';
             traceWebRtc('interviewer:behavior:listening', { type });
@@ -394,7 +431,7 @@ export default function Page() {
             return;
           }
 
-          if (type === 'conversation.item.input_audio_transcription.completed') {
+          if (candidateFinalTypes.has(type)) {
             const transcript = findTranscript(parsed);
             if (!transcript) {
               return;
@@ -408,7 +445,7 @@ export default function Page() {
             return;
           }
 
-          if (type === 'input_audio_transcription.partial' || type === 'conversation.item.input_audio_transcription.delta') {
+          if (candidateDeltaTypes.has(type)) {
             const delta = findTranscript(parsed);
             if (!delta) {
               return;
@@ -577,6 +614,7 @@ export default function Page() {
           localStream={localStream}
           resetSignal={stageResetSignal}
           sessionStatus={status}
+          onInterviewerStatusChange={handleInterviewerStatusChange}
         />
       </div>
     </main>
