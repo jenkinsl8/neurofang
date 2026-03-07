@@ -176,11 +176,15 @@ app.post('/session', async (req, res) => {
         input: {
           turn_detection: {
             type: 'server_vad',
-            create_response: true,
+            create_response: false,
             interrupt_response: true
           }
         },
         output: {
+          format: {
+            type: 'audio/pcm',
+            rate_hz: 24000
+          },
           voice: realtimeVoice
         }
       },
