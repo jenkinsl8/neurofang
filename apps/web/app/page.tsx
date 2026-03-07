@@ -766,17 +766,30 @@ export default function Page() {
       controlChannel.onopen = () => {
         traceWebRtc('datachannel:open');
         setInterviewerStatus('listening');
-        const kickoffEvent = {
-          type: 'response.create',
-          response: {
-            modalities: ['audio', 'text'],
-            instructions:
-              'Begin now: greet the candidate, introduce yourself as the interviewer, summarize the role context, then ask the first interview question.'
+
+        const kickoffPrompt =
+          'Begin now: greet the candidate, introduce yourself as the interviewer, summarize the role context, then ask the first interview question.';
+
+        const kickoffConversationEvent = {
+          type: 'conversation.item.create',
+          item: {
+            type: 'message',
+            role: 'user',
+            content: [{ type: 'input_text', text: kickoffPrompt }]
           }
         };
 
-        traceWebRtc('kickoff:response-create:send', kickoffEvent);
-        controlChannel.send(JSON.stringify(kickoffEvent));
+        const kickoffResponseEvent = {
+          type: 'response.create',
+          response: {
+            modalities: ['audio', 'text']
+          }
+        };
+
+        traceWebRtc('kickoff:conversation-item:create:send', kickoffConversationEvent);
+        controlChannel.send(JSON.stringify(kickoffConversationEvent));
+        traceWebRtc('kickoff:response-create:send', kickoffResponseEvent);
+        controlChannel.send(JSON.stringify(kickoffResponseEvent));
       };
 
       await exchangeSessionSdp(peer, {
