@@ -79,20 +79,28 @@ app.post('/api/avatars/pick', (req, res) => {
   res.json({ avatar });
 });
 
+const thumbnailExtensions = ['svg', 'png', 'jpg', 'jpeg', 'webp'];
+
+function resolveLocalAssetFile(baseDirectories: string[], fileBaseName: string, extensions: string[]) {
+  for (const assetDirectory of baseDirectories) {
+    for (const extension of extensions) {
+      const candidate = path.join(assetDirectory, `${fileBaseName}.${extension}`);
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
+  return null;
+}
+
 async function generateAvatarThumbnail(avatarId: string) {
   const avatar = avatarCatalog.find((item) => item.id === avatarId);
   if (!avatar) {
     return null;
   }
 
-  for (const assetDirectory of avatarAssetDirectories) {
-    const localAvatarThumbnailPath = path.join(assetDirectory, `${avatar.id}.svg`);
-    if (fs.existsSync(localAvatarThumbnailPath)) {
-      return localAvatarThumbnailPath;
-    }
-  }
-
-  return null;
+  return resolveLocalAssetFile(avatarAssetDirectories, avatar.id, thumbnailExtensions);
 }
 
 app.get('/api/avatars/:avatarId/thumbnail', async (req, res) => {
@@ -113,13 +121,17 @@ app.get('/api/avatars/:avatarId/thumbnail', async (req, res) => {
     console.warn(`Failed generating thumbnail for ${avatar.id}:`, error);
   }
 
-  const fallbackPath = path.resolve(process.cwd(), 'apps/web/public/avatars/placeholder.svg');
-  if (fs.existsSync(fallbackPath)) {
+  const fallbackPath = resolveLocalAssetFile(
+    avatarAssetDirectories,
+    'placeholder',
+    thumbnailExtensions
+  );
+  if (fallbackPath) {
     res.sendFile(fallbackPath);
     return;
   }
 
-  res.status(404).json({ error: 'No thumbnail available for avatar' });
+  res.status(404).json({ error: 'No thumbnail available for avatar or placeholder' });
 });
 
 app.post('/session', async (req, res) => {

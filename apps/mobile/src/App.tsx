@@ -41,6 +41,10 @@ async function waitForIceGatheringComplete(peer: RTCPeerConnection) {
     };
 
     peer.addEventListener('icegatheringstatechange', onIceGatheringStateChange);
+
+    // Guard against a race where ICE reaches `complete` between the initial check
+    // and listener registration, which would otherwise leave this promise unresolved.
+    onIceGatheringStateChange();
   });
 }
 
