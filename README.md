@@ -35,7 +35,7 @@ cp apps/mobile/.env.example apps/mobile/.env
 
 ```bash
 OPENAI_API_KEY=sk-...
-OPENAI_REALTIME_MODEL=gpt-4o-realtime-preview
+OPENAI_REALTIME_MODEL=gpt-realtime
 OPENAI_REALTIME_VOICE=alloy
 PORT=8787
 AZURE_SPEECH_KEY=
@@ -100,7 +100,7 @@ npm run ios -w @dominion/mobile
 
 1. Client creates WebRTC offer SDP.
 2. Client `POST`s `{ sdp, intake, avatarId }` to `apps/server /session`.
-3. Server forwards to `https://api.openai.com/v1/realtime/calls` with multipart form data:
+3. Server forwards to `https://api.openai.com/v1/realtime/calls` with multipart form data (using `gpt-realtime` by default):
    - `sdp` (offer)
    - `session` (json config + business-professional interviewer instructions)
 4. Server returns answer SDP as `{ answerSdp }`.

@@ -20,6 +20,9 @@ const PORT = Number(process.env.PORT ?? 8787);
 const allowedDifficulties: InterviewDifficulty[] = ['friendly', 'neutral', 'tough'];
 const allowedPersonalities: InterviewPersonality[] = ['friendly', 'analytical', 'skeptical', 'executive'];
 
+const realtimeModel = process.env.OPENAI_REALTIME_MODEL ?? 'gpt-realtime';
+const realtimeVoice = process.env.OPENAI_REALTIME_VOICE ?? 'alloy';
+
 
 const TRACE_WEBRTC = process.env.TRACE_WEBRTC === '1' || process.env.TRACE_WEBRTC === 'true';
 
@@ -153,7 +156,7 @@ app.post('/session', async (req, res) => {
     'session',
     JSON.stringify({
       type: 'realtime',
-      model: process.env.OPENAI_REALTIME_MODEL ?? 'gpt-4o-realtime-preview',
+      model: realtimeModel,
       modalities: ['text', 'audio'],
       audio: {
         input: {
@@ -163,7 +166,7 @@ app.post('/session', async (req, res) => {
           }
         },
         output: {
-          voice: process.env.OPENAI_REALTIME_VOICE ?? 'alloy'
+          voice: realtimeVoice
         }
       },
       instructions: [
@@ -185,8 +188,8 @@ app.post('/session', async (req, res) => {
 
   try {
     traceWebRtc('openai:request:start', {
-      model: process.env.OPENAI_REALTIME_MODEL ?? 'gpt-4o-realtime-preview',
-      voice: process.env.OPENAI_REALTIME_VOICE ?? 'alloy',
+      model: realtimeModel,
+      voice: realtimeVoice,
       difficulty: difficultyLabel,
       personality: personalityLabel,
       sdpLength: body.sdp.length
@@ -202,7 +205,11 @@ app.post('/session', async (req, res) => {
 
     if (!response.ok) {
       const text = await response.text();
-      traceWebRtc('openai:request:failure', { status: response.status, bodyLength: text.length });
+      traceWebRtc('openai:request:failure', {
+        status: response.status,
+        bodyLength: text.length,
+        bodyPreview: text.slice(0, 500)
+      });
       res.status(response.status).json({ error: text });
       return;
     }
