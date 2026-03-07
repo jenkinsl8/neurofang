@@ -12,6 +12,10 @@ const AvatarStage = dynamic(
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:8787';
 const FALLBACK_THUMBNAIL = '/avatars/placeholder.svg';
 
+type MediaDevicesWithAudioOutput = MediaDevices & {
+  selectAudioOutput?: (options?: { deviceId?: string }) => Promise<MediaDeviceInfo>;
+};
+
 function resolveAssetUrl(path: string | undefined) {
   if (!path) {
     return FALLBACK_THUMBNAIL;
@@ -72,6 +76,8 @@ export default function Page() {
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedOutputDeviceId, setSelectedOutputDeviceId] = useState<string>('default');
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [stageResetSignal, setStageResetSignal] = useState(0);
@@ -128,6 +134,69 @@ export default function Page() {
     };
   }, []);
 
+
+  useEffect(() => {
+    void refreshAudioOutputDevices();
+
+    const handleDeviceChange = () => {
+      void refreshAudioOutputDevices();
+    };
+
+    navigator.mediaDevices?.addEventListener?.('devicechange', handleDeviceChange);
+
+    return () => {
+      navigator.mediaDevices?.removeEventListener?.('devicechange', handleDeviceChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    void applyAudioOutputDevice(selectedOutputDeviceId).catch((nextError) => {
+      setError(nextError instanceof Error ? nextError.message : 'Failed to route audio output');
+    });
+  }, [selectedOutputDeviceId]);
+
+
+  async function refreshAudioOutputDevices() {
+    if (!navigator.mediaDevices?.enumerateDevices) {
+      return;
+    }
+
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const outputs = devices.filter((device) => device.kind === 'audiooutput');
+
+    setAudioOutputDevices(outputs);
+
+    if (outputs.length > 0 && !outputs.some((device) => device.deviceId === selectedOutputDeviceId)) {
+      setSelectedOutputDeviceId('default');
+    }
+  }
+
+  async function applyAudioOutputDevice(deviceId: string) {
+    const audio = remoteAudioRef.current as (HTMLAudioElement & { setSinkId?: (sinkId: string) => Promise<void> }) | null;
+    if (!audio || typeof audio.setSinkId !== 'function') {
+      return;
+    }
+
+    await audio.setSinkId(deviceId);
+  }
+
+  async function requestSpeakerAccess() {
+    const mediaDevices = navigator.mediaDevices as MediaDevicesWithAudioOutput | undefined;
+
+    if (!mediaDevices?.selectAudioOutput) {
+      return;
+    }
+
+    const selected = await mediaDevices.selectAudioOutput({
+      deviceId: selectedOutputDeviceId === 'default' ? undefined : selectedOutputDeviceId
+    });
+
+    if (selected?.deviceId) {
+      setSelectedOutputDeviceId(selected.deviceId);
+      await applyAudioOutputDevice(selected.deviceId);
+    }
+  }
+
   async function connect() {
     try {
       setError('');
@@ -138,6 +207,9 @@ export default function Page() {
       setStatus('connecting');
 
       const userStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      await refreshAudioOutputDevices();
+      await requestSpeakerAccess();
+      await applyAudioOutputDevice(selectedOutputDeviceId);
       localStreamRef.current = userStream;
       setLocalStream(userStream);
       peer.addTransceiver('audio', { direction: 'sendrecv' });
@@ -239,7 +311,7 @@ export default function Page() {
   return (
     <main>
       <h1>Dominion MVP</h1>
-      <audio ref={remoteAudioRef} autoPlay playsInline />
+      <audio ref={remoteAudioRef} autoPlay playsInline controls />
       {error ? <p style={{ color: '#fca5a5' }}>{error}</p> : null}
       <div className="card">
         <h3>Interview intake</h3>
@@ -283,6 +355,26 @@ export default function Page() {
             />
           ) : null}
           <button onClick={connect} disabled={status !== 'idle' || !selectedAvatar}>Connect</button>
+          <div style={{ marginTop: 10 }}>
+            <label style={{ fontSize: 13 }}>
+              Speaker output
+              <select
+                value={selectedOutputDeviceId}
+                onChange={(e) => setSelectedOutputDeviceId(e.target.value)}
+                style={{ display: 'block', marginTop: 4 }}
+              >
+                <option value="default">System default speaker</option>
+                {audioOutputDevices.map((device) => (
+                  <option key={device.deviceId} value={device.deviceId}>
+                    {device.label || `Speaker ${device.deviceId.slice(0, 8)}`}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
+              If prompted, allow speaker access and pick your headphones or speakers here.
+            </div>
+          </div>
           <div style={{ height: 8 }} />
           <button onClick={disconnect} disabled={status === 'idle'}>Disconnect</button>
           <div style={{ marginTop: 12 }}>

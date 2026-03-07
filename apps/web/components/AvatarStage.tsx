@@ -23,6 +23,20 @@ type UnityStageMessage = {
 const FALLBACK_THUMBNAIL = '/avatars/placeholder.svg';
 const SPEAKING_THRESHOLD = 0.12;
 
+function resolveInterviewerStatus(remoteSpeechLevel: number, remoteStream?: MediaStream | null) {
+  const hasRemoteAudio = Boolean(remoteStream?.getAudioTracks().some((track) => track.readyState === 'live'));
+
+  if (!hasRemoteAudio) {
+    return 'idle';
+  }
+
+  if (remoteSpeechLevel > SPEAKING_THRESHOLD) {
+    return 'speaking';
+  }
+
+  return 'processing';
+}
+
 export function resolveStageImageSrc(thumbnailPath?: string) {
   return thumbnailPath?.trim() ? thumbnailPath : FALLBACK_THUMBNAIL;
 }
@@ -100,6 +114,7 @@ export function AvatarStage({ unitySceneUrl, thumbnailPath, remoteStream, localS
   const hasSceneUrl = sceneUrl.length > 0;
   const remoteSpeechLevel = useSpeechLevel(remoteStream, resetSignal);
   const localSpeechLevel = useSpeechLevel(localStream, resetSignal);
+  const interviewerStatus = resolveInterviewerStatus(remoteSpeechLevel, remoteStream);
 
   useEffect(() => {
     setImageSrc(resolveStageImageSrc(thumbnailPath));
@@ -144,8 +159,9 @@ export function AvatarStage({ unitySceneUrl, thumbnailPath, remoteStream, localS
         </div>
       ) : null}
       <div style={{ marginTop: 8, fontSize: 12, color: '#93c5fd' }}>
-        Voice activity:{' '}
-        <span style={{ color: '#e2e8f0' }}>interviewer {Math.round(remoteSpeechLevel * 100)}% · candidate {Math.round(localSpeechLevel * 100)}%</span>
+        Interviewer status:{' '}
+        <span style={{ color: '#e2e8f0', textTransform: 'capitalize' }}>{interviewerStatus}</span>
+        <span style={{ color: '#64748b' }}> · interviewer {Math.round(remoteSpeechLevel * 100)}% · candidate {Math.round(localSpeechLevel * 100)}%</span>
       </div>
     </div>
   );
