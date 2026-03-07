@@ -628,6 +628,19 @@ export default function Page() {
             });
           }
 
+          if (type === 'response.done') {
+            const response = asRecord(parsed.response);
+            const status = toText(response?.status) ?? 'unknown';
+            const statusDetails = asRecord(response?.status_details);
+            traceWebRtc('response:done:diagnostic', {
+              responseId: toText(response?.id) ?? null,
+              status,
+              reason: toText(statusDetails?.reason) ?? null,
+              error: statusDetails?.error ?? null,
+              full: parsed
+            });
+          }
+
           if (type === 'session.updated') {
             const session = asRecord(parsed.session);
             const outputAudioFormat = session ? toText(session.output_audio_format) : null;
@@ -780,7 +793,10 @@ export default function Page() {
         };
 
         const kickoffResponseEvent = {
-          type: 'response.create'
+          type: 'response.create',
+          response: {
+            modalities: ['audio', 'text']
+          }
         };
 
         traceWebRtc('kickoff:conversation-item:create:send', kickoffConversationEvent);
