@@ -102,6 +102,95 @@ function describeTrack(track: MediaStreamTrack) {
   };
 }
 
+type MicrophoneTraceController = {
+  stop: () => void;
+};
+
+function monitorMicrophoneInput(stream: MediaStream): MicrophoneTraceController | null {
+  if (!TRACE_WEBRTC) {
+    return null;
+  }
+
+  const [audioTrack] = stream.getAudioTracks();
+  if (!audioTrack) {
+    traceWebRtc('microphone:monitor:skipped', { reason: 'missing-audio-track' });
+    return null;
+  }
+
+  const AudioContextCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextCtor) {
+    traceWebRtc('microphone:monitor:skipped', { reason: 'audio-context-not-supported' });
+    return null;
+  }
+
+  const audioContext = new AudioContextCtor();
+  const source = audioContext.createMediaStreamSource(stream);
+  const analyser = audioContext.createAnalyser();
+  analyser.fftSize = 1024;
+  source.connect(analyser);
+
+  const pcm = new Uint8Array(analyser.fftSize);
+  const speechFloor = 0.02;
+  let recentPeak = 0;
+  let speaking = false;
+  let segmentStartedAt = 0;
+
+  traceWebRtc('microphone:monitor:started', {
+    sampleRate: audioContext.sampleRate,
+    audioTrackId: audioTrack.id,
+    audioTrackLabel: audioTrack.label
+  });
+
+  const meterInterval = window.setInterval(() => {
+    analyser.getByteTimeDomainData(pcm);
+
+    let sumSquares = 0;
+    for (let index = 0; index < pcm.length; index += 1) {
+      const normalized = (pcm[index] - 128) / 128;
+      sumSquares += normalized * normalized;
+    }
+
+    const rms = Math.sqrt(sumSquares / pcm.length);
+    recentPeak = Math.max(recentPeak, rms);
+
+    traceWebRtc('microphone:input:level', {
+      rms: Number(rms.toFixed(4)),
+      peak: Number(recentPeak.toFixed(4)),
+      speechDetected: rms >= speechFloor
+    });
+
+    if (rms >= speechFloor && !speaking) {
+      speaking = true;
+      segmentStartedAt = Date.now();
+      traceWebRtc('microphone:input:speech-started', {
+        rms: Number(rms.toFixed(4)),
+        threshold: speechFloor
+      });
+      return;
+    }
+
+    if (rms < speechFloor && speaking) {
+      speaking = false;
+      const durationMs = Math.max(0, Date.now() - segmentStartedAt);
+      traceWebRtc('microphone:input:speech-ended', {
+        durationMs,
+        peak: Number(recentPeak.toFixed(4))
+      });
+      recentPeak = 0;
+    }
+  }, 500);
+
+  return {
+    stop: () => {
+      window.clearInterval(meterInterval);
+      source.disconnect();
+      analyser.disconnect();
+      void audioContext.close();
+      traceWebRtc('microphone:monitor:stopped', { audioTrackId: audioTrack.id });
+    }
+  };
+}
+
 function resolveAssetUrl(path: string | undefined) {
   if (!path) {
     return FALLBACK_THUMBNAIL;
@@ -183,9 +272,13 @@ export default function Page() {
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [stageResetSignal, setStageResetSignal] = useState(0);
+  const [interviewerStatus, setInterviewerStatus] = useState('idle');
+  const [candidateTranscript, setCandidateTranscript] = useState('');
+  const [interviewerTranscript, setInterviewerTranscript] = useState('');
   const aiTranscriptBufferRef = useRef<string>('');
   const userTranscriptBufferRef = useRef<string>('');
   const mediaTraceCleanupRef = useRef<(() => void) | null>(null);
+  const microphoneTraceCleanupRef = useRef<(() => void) | null>(null);
 
   const selectedAvatar = useMemo(
     () => avatars.find((avatar) => avatar.id === avatarId) ?? avatars[0],
@@ -194,8 +287,9 @@ export default function Page() {
 
 
   const handleInterviewerStatusChange = useCallback(
-    (interviewerStatus: string) => {
-      traceWebRtc('interviewer:status:changed', { interviewerStatus });
+    (nextInterviewerStatus: string) => {
+      setInterviewerStatus(nextInterviewerStatus);
+      traceWebRtc('interviewer:status:changed', { interviewerStatus: nextInterviewerStatus });
     },
     []
   );
@@ -281,6 +375,9 @@ export default function Page() {
     try {
       setError('');
       setStageResetSignal((current) => current + 1);
+      setInterviewerStatus('idle');
+      setCandidateTranscript('');
+      setInterviewerTranscript('');
       traceWebRtc('connect:start', { avatarId: selectedAvatar?.id, intake });
       const peer = new RTCPeerConnection();
       peerRef.current = peer;
@@ -307,6 +404,8 @@ export default function Page() {
       localStreamRef.current = userStream;
       setLocalStream(userStream);
       monitorLocalMediaTracks(userStream);
+      microphoneTraceCleanupRef.current?.();
+      microphoneTraceCleanupRef.current = monitorMicrophoneInput(userStream)?.stop ?? null;
       peer.addTransceiver('audio', { direction: 'sendrecv' });
       userStream
         .getAudioTracks()
@@ -365,6 +464,12 @@ export default function Page() {
 
       const controlChannel = peer.createDataChannel('oai-events');
       controlChannelRef.current = controlChannel;
+      controlChannel.onerror = (event) => {
+        traceWebRtc('datachannel:error', { event });
+      };
+      controlChannel.onclose = () => {
+        traceWebRtc('datachannel:closed');
+      };
       controlChannel.onmessage = (event) => {
         try {
           const payload = JSON.parse(String(event.data)) as unknown;
@@ -376,6 +481,15 @@ export default function Page() {
           const type = toText(parsed.type);
           if (!type) {
             return;
+          }
+
+          traceWebRtc('datachannel:event', { type });
+
+          if (
+            type.startsWith('input_audio_') ||
+            type.startsWith('conversation.item.input_audio_')
+          ) {
+            traceWebRtc('microphone:event', { type, payload: parsed });
           }
 
           const candidateDeltaTypes = new Set([
@@ -392,23 +506,38 @@ export default function Page() {
 
           if (type === 'input_audio_buffer.speech_started') {
             userTranscriptBufferRef.current = '';
+            setCandidateTranscript('');
+            setInterviewerStatus('listening');
             traceWebRtc('interviewer:behavior:listening', { type });
             return;
           }
 
           if (type === 'response.output_audio.started') {
             aiTranscriptBufferRef.current = '';
+            setInterviewerTranscript('');
+            setInterviewerStatus('talking');
             traceWebRtc('interviewer:behavior:talking', { type });
             return;
           }
 
-          if (type === 'response.audio_transcript.delta') {
+          if (type === 'response.created' || type === 'response.create') {
+            setInterviewerStatus('thinking');
+            return;
+          }
+
+          if (type === 'response.output_audio.done') {
+            setInterviewerStatus('listening');
+            return;
+          }
+
+          if (type === 'response.audio_transcript.delta' || type === 'response.output_text.delta') {
             const delta = findTranscript(parsed);
             if (!delta) {
               return;
             }
 
             aiTranscriptBufferRef.current = `${aiTranscriptBufferRef.current}${delta}`;
+            setInterviewerTranscript(aiTranscriptBufferRef.current);
             traceWebRtc('interviewer:speech:delta', {
               type,
               text: delta,
@@ -417,12 +546,13 @@ export default function Page() {
             return;
           }
 
-          if (type === 'response.audio_transcript.done') {
+          if (type === 'response.audio_transcript.done' || type === 'response.output_text.done') {
             const transcript = findTranscript(parsed) ?? aiTranscriptBufferRef.current;
             if (!transcript) {
               return;
             }
 
+            setInterviewerTranscript(transcript);
             traceWebRtc('interviewer:speech:final', {
               type,
               text: transcript
@@ -438,6 +568,7 @@ export default function Page() {
             }
 
             userTranscriptBufferRef.current = transcript;
+            setCandidateTranscript(transcript);
             traceWebRtc('candidate:speech:final', {
               type,
               text: transcript
@@ -452,17 +583,23 @@ export default function Page() {
             }
 
             userTranscriptBufferRef.current = `${userTranscriptBufferRef.current}${delta}`;
+            setCandidateTranscript(userTranscriptBufferRef.current);
             traceWebRtc('candidate:speech:delta', {
               type,
               text: delta,
               aggregate: userTranscriptBufferRef.current
             });
           }
-        } catch {
-          // Ignore non-JSON or unknown data channel messages.
+        } catch (parseError) {
+          traceWebRtc('datachannel:message:parse-error', {
+            message: parseError instanceof Error ? parseError.message : 'unknown-parse-error',
+            raw: String(event.data)
+          });
         }
       };
       controlChannel.onopen = () => {
+        traceWebRtc('datachannel:open');
+        setInterviewerStatus('thinking');
         const kickoffEvent = {
           type: 'response.create',
           response: {
@@ -543,8 +680,13 @@ export default function Page() {
     }
     setRemoteStream(null);
     setStageResetSignal((current) => current + 1);
+    setInterviewerStatus('idle');
+    setCandidateTranscript('');
+    setInterviewerTranscript('');
     setStatus('idle');
     mediaTraceCleanupRef.current?.();
+    microphoneTraceCleanupRef.current?.();
+    microphoneTraceCleanupRef.current = null;
     traceWebRtc('disconnect:completed', { reason });
   }
 
@@ -591,6 +733,7 @@ export default function Page() {
         <div>
           <h3>Interview stage</h3>
           <p>Status: {status}</p>
+          <p>Interviewer status: {interviewerStatus}</p>
           <p>Interviewer: {selectedAvatar?.name ?? 'Loading...'}</p>
           {selectedAvatar ? (
             <AvatarThumbnail
@@ -602,7 +745,13 @@ export default function Page() {
           <button onClick={connect} disabled={status !== 'idle' || !selectedAvatar}>Connect</button>
           <div style={{ height: 8 }} />
           <button onClick={handleDisconnectClick} disabled={status === 'idle'}>Disconnect</button>
-          <div style={{ marginTop: 12 }}>
+          <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
+            <div style={{ fontSize: 13 }}>
+              <strong>Candidate heard:</strong> {candidateTranscript || '—'}
+            </div>
+            <div style={{ fontSize: 13 }}>
+              <strong>Interviewer said:</strong> {interviewerTranscript || '—'}
+            </div>
             <div style={{ fontSize: 13, marginBottom: 6 }}>Camera feed (optional local coaching modules)</div>
             <video ref={localVideoRef} autoPlay muted playsInline className="local-video" />
           </div>
