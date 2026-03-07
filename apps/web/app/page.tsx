@@ -69,6 +69,7 @@ export default function Page() {
   const [error, setError] = useState<string>('');
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const remoteStreamRef = useRef<MediaStream | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
@@ -132,6 +133,7 @@ export default function Page() {
       setStageResetSignal((current) => current + 1);
       const peer = new RTCPeerConnection();
       peerRef.current = peer;
+      remoteStreamRef.current = new MediaStream();
       setStatus('connecting');
 
       const userStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
@@ -144,15 +146,36 @@ export default function Page() {
         localVideoRef.current.srcObject = userStream;
       }
 
-      const remote = new MediaStream();
       peer.ontrack = (event) => {
-        event.streams[0].getTracks().forEach((track) => remote.addTrack(track));
-        setRemoteStream(new MediaStream(remote.getTracks()));
+        const remote = remoteStreamRef.current;
+        if (!remote) {
+          return;
+        }
+
+        if (!remote.getTracks().some((track) => track.id === event.track.id)) {
+          remote.addTrack(event.track);
+        }
+
+        setRemoteStream(new MediaStream(remote.getAudioTracks()));
+
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = remote;
+          void remoteAudioRef.current.play().catch((playError) => {
+            if (
+              playError instanceof DOMException &&
+              (playError.name === 'AbortError' || playError.name === 'NotAllowedError')
+            ) {
+              return;
+            }
+
+            setError(playError instanceof Error ? playError.message : 'Failed to play remote audio');
+          });
+        }
       };
 
       const audio = remoteAudioRef.current;
       if (audio) {
-        audio.srcObject = remote;
+        audio.srcObject = remoteStreamRef.current;
         void audio.play().catch((playError) => {
           if (
             playError instanceof DOMException &&
@@ -199,6 +222,8 @@ export default function Page() {
       remoteAudioRef.current.pause();
       remoteAudioRef.current.srcObject = null;
     }
+    remoteStreamRef.current?.getTracks().forEach((track) => track.stop());
+    remoteStreamRef.current = null;
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = null;
     }
