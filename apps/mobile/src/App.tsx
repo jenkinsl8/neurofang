@@ -4,6 +4,7 @@ import { mediaDevices, RTCPeerConnection } from 'react-native-webrtc';
 import { defaultRealtimeIceServers, type AvatarCatalogEntry, type InterviewIntake } from '@dominion/shared';
 
 const SERVER_URL = process.env.EXPO_PUBLIC_SERVER_URL ?? 'http://192.168.1.100:8787';
+const SESSION_REQUEST_TIMEOUT_MS = Number(process.env.EXPO_PUBLIC_SESSION_REQUEST_TIMEOUT_MS ?? 25000);
 
 
 const TRACE_WEBRTC =
@@ -40,6 +41,10 @@ async function waitForIceGatheringComplete(peer: RTCPeerConnection) {
     };
 
     peer.addEventListener('icegatheringstatechange', onIceGatheringStateChange);
+
+    // Guard against a race where ICE reaches `complete` between the initial check
+    // and listener registration, which would otherwise leave this promise unresolved.
+    onIceGatheringStateChange();
   });
 }
 
@@ -82,12 +87,33 @@ async function exchangeSessionSdp(
     throw new Error(`Missing local SDP for ${options.reason}`);
   }
 
-  traceWebRtc('session:request:start', { reason: options.reason, url: `${SERVER_URL}/session` });
-  const res = await fetch(`${SERVER_URL}/session`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sdp: localSdp, avatarId: options.avatarId, intake: options.intake })
+  traceWebRtc('session:request:start', {
+    reason: options.reason,
+    url: `${SERVER_URL}/session`,
+    timeoutMs: SESSION_REQUEST_TIMEOUT_MS
   });
+  const sessionRequestController = new AbortController();
+  const sessionRequestTimeout = setTimeout(() => sessionRequestController.abort(), SESSION_REQUEST_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`${SERVER_URL}/session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sdp: localSdp, avatarId: options.avatarId, intake: options.intake }),
+      signal: sessionRequestController.signal
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      traceWebRtc('session:request:timeout', { reason: options.reason, timeoutMs: SESSION_REQUEST_TIMEOUT_MS });
+      throw new Error(`Session request timed out after ${SESSION_REQUEST_TIMEOUT_MS}ms`);
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(sessionRequestTimeout);
+  }
+
   traceWebRtc('session:request:response', { reason: options.reason, status: res.status, ok: res.ok });
 
   if (!res.ok) {

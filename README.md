@@ -37,6 +37,7 @@ cp apps/mobile/.env.example apps/mobile/.env
 OPENAI_API_KEY=sk-...
 OPENAI_REALTIME_MODEL=gpt-realtime
 OPENAI_REALTIME_VOICE=alloy
+OPENAI_REALTIME_TIMEOUT_MS=20000
 PORT=8787
 AZURE_SPEECH_KEY=
 AZURE_SPEECH_REGION=
@@ -49,6 +50,7 @@ TRACE_WEBRTC=false
 ```bash
 NEXT_PUBLIC_SERVER_URL=http://localhost:8787
 NEXT_PUBLIC_TRACE_WEBRTC=false
+NEXT_PUBLIC_SESSION_REQUEST_TIMEOUT_MS=25000
 ```
 
 `apps/mobile/.env` (required for LAN device testing):
@@ -56,6 +58,7 @@ NEXT_PUBLIC_TRACE_WEBRTC=false
 ```bash
 EXPO_PUBLIC_SERVER_URL=http://192.168.1.X:8787
 EXPO_PUBLIC_TRACE_WEBRTC=false
+EXPO_PUBLIC_SESSION_REQUEST_TIMEOUT_MS=25000
 ```
 
 ### Optional trace logging (CLI-enabled)
@@ -127,13 +130,13 @@ The default interviewer catalog now uses pre-rigged MakeHuman IDs (`makeHumanMod
 Current local setup:
 1. `apps/web/public/unity/interviewer/index.html` is a lightweight Unity-stage mock that listens for postMessage stage events.
 2. `apps/web/components/AvatarStage.tsx` computes voice activity from remote audio and sends `{ speechLevel, isSpeaking, isListening }` to the scene.
-3. `/api/avatars/:avatarId/thumbnail` serves local avatar SVG thumbnails and falls back to `apps/web/public/avatars/placeholder.svg`.
+3. `/api/avatars/:avatarId/thumbnail` serves local avatar thumbnails (`svg|png|jpg|jpeg|webp`) and falls back to `apps/web/public/avatars/placeholder.*`.
 
 To switch to real Unity WebGL builds with MakeHuman rigs:
 1. Export your pre-rigged MakeHuman characters (FBX) and import into Unity.
 2. Build a head-and-shoulders scene with idle/blink/nod/lipsync, then export Unity WebGL to `apps/web/public/unity/<scene-name>/`.
 3. Update each avatar's `unitySceneUrl` and `makeHumanModelId` in `apps/server/src/avatarCatalog.ts`.
-4. Keep thumbnails in `apps/web/public/avatars/<avatar-id>.svg|png|jpg`.
+4. Keep thumbnails in `apps/web/public/avatars/<avatar-id>.svg|png|jpg|jpeg|webp` (same extensions supported for `placeholder`).
 5. Ensure your Unity runtime listens for `window.postMessage` events with `type: "neurofang-stage-state"`.
 
 ## Web interviewer behavior
