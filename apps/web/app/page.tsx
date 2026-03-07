@@ -658,6 +658,8 @@ export default function Page() {
             const response = asRecord(parsed.response);
             const status = toText(response?.status) ?? 'unknown';
             const statusDetails = asRecord(response?.status_details);
+            const responseError = asRecord(statusDetails?.error);
+            const responseErrorMessage = toText(responseError?.message);
             traceWebRtc('response:done:diagnostic', {
               responseId: toText(response?.id) ?? null,
               status,
@@ -665,6 +667,11 @@ export default function Page() {
               error: statusDetails?.error ?? null,
               full: parsed
             });
+
+            if (status === 'failed') {
+              setInterviewerStatus('listening');
+              setError(responseErrorMessage ?? 'Realtime response failed. Please retry.');
+            }
           }
 
           if (type === 'session.updated') {
@@ -719,6 +726,7 @@ export default function Page() {
           }
 
           if (type === 'response.created' || type === 'response.create') {
+            setError('');
             setInterviewerStatus('thinking');
             if (type === 'response.created') {
               traceWebRtc('kickoff:response-create:accepted', {
@@ -820,9 +828,7 @@ export default function Page() {
 
         const kickoffResponseEvent = {
           type: 'response.create',
-          response: {
-            modalities: ['audio', 'text']
-          }
+          response: {}
         };
 
         traceWebRtc('kickoff:conversation-item:create:send', kickoffConversationEvent);
