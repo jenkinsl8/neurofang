@@ -136,6 +136,7 @@ app.post('/session', async (req, res) => {
     JSON.stringify({
       type: 'realtime',
       model: process.env.OPENAI_REALTIME_MODEL ?? 'gpt-4o-realtime-preview',
+      modalities: ['text', 'audio'],
       audio: {
         input: {
           turn_detection: {
