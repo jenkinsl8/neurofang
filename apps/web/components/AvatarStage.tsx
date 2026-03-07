@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import React from 'react';
 
+export type InterviewerStatus = 'idle/listening' | 'active/talking' | 'active/listening';
+
 type Props = {
   unitySceneUrl: string;
   thumbnailPath: string;
@@ -10,6 +12,7 @@ type Props = {
   localStream?: MediaStream | null;
   resetSignal?: number;
   sessionStatus?: 'idle' | 'connecting' | 'connected';
+  onInterviewerStatusChange?: (status: InterviewerStatus) => void;
 };
 
 type UnityStageMessage = {
@@ -29,7 +32,7 @@ function resolveInterviewerStatus(
   remoteStream: MediaStream | null | undefined,
   localSpeechLevel: number,
   sessionStatus: Props['sessionStatus']
-) {
+): InterviewerStatus {
   if (sessionStatus !== 'connected') {
     return 'idle/listening';
   }
@@ -121,7 +124,8 @@ export function AvatarStage({
   remoteStream,
   localStream,
   resetSignal = 0,
-  sessionStatus = 'idle'
+  sessionStatus = 'idle',
+  onInterviewerStatusChange
 }: Props) {
   const [imageSrc, setImageSrc] = useState(resolveStageImageSrc(thumbnailPath));
   const [hasEmbedError, setHasEmbedError] = useState(false);
@@ -137,6 +141,17 @@ export function AvatarStage({
     localSpeechLevel,
     sessionStatus
   );
+
+  const lastInterviewerStatusRef = useRef<InterviewerStatus | null>(null);
+
+  useEffect(() => {
+    if (lastInterviewerStatusRef.current === interviewerStatus) {
+      return;
+    }
+
+    lastInterviewerStatusRef.current = interviewerStatus;
+    onInterviewerStatusChange?.(interviewerStatus);
+  }, [interviewerStatus, onInterviewerStatusChange]);
 
   useEffect(() => {
     setImageSrc(resolveStageImageSrc(thumbnailPath));
