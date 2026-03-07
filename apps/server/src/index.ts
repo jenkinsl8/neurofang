@@ -20,7 +20,10 @@ const PORT = Number(process.env.PORT ?? 8787);
 const allowedDifficulties: InterviewDifficulty[] = ['friendly', 'neutral', 'tough'];
 const allowedPersonalities: InterviewPersonality[] = ['friendly', 'analytical', 'skeptical', 'executive'];
 
-const realtimeModel = process.env.OPENAI_REALTIME_MODEL ?? 'gpt-realtime';
+const configuredRealtimeModel = process.env.OPENAI_REALTIME_MODEL?.trim();
+const realtimeModel = configuredRealtimeModel === 'gpt-4o-realtime-preview'
+  ? 'gpt-realtime'
+  : configuredRealtimeModel || 'gpt-realtime';
 const realtimeVoice = process.env.OPENAI_REALTIME_VOICE ?? 'alloy';
 
 
@@ -224,5 +227,10 @@ app.post('/session', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Dominion server listening on http://localhost:${PORT}`);
+  if (configuredRealtimeModel === 'gpt-4o-realtime-preview') {
+    console.warn(
+      'OPENAI_REALTIME_MODEL is set to deprecated gpt-4o-realtime-preview; automatically using gpt-realtime instead.'
+    );
+  }
   traceWebRtc('server:trace-enabled', { enabled: TRACE_WEBRTC });
 });
