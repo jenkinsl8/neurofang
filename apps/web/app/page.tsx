@@ -69,9 +69,10 @@ export default function Page() {
   const [intake, setIntake] = useState<InterviewIntake>(defaultIntake);
   const [avatars, setAvatars] = useState<AvatarCatalogEntry[]>([]);
   const [avatarId, setAvatarId] = useState<string>('pick-for-me');
-  const [status, setStatus] = useState('idle');
+  const [status, setStatus] = useState<'idle' | 'connecting' | 'connected'>('idle');
   const [error, setError] = useState<string>('');
   const peerRef = useRef<RTCPeerConnection | null>(null);
+  const controlChannelRef = useRef<RTCDataChannel | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -209,7 +210,6 @@ export default function Page() {
       const userStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
       await refreshAudioOutputDevices();
       await requestSpeakerAccess();
-      await applyAudioOutputDevice(selectedOutputDeviceId);
       localStreamRef.current = userStream;
       setLocalStream(userStream);
       peer.addTransceiver('audio', { direction: 'sendrecv' });
@@ -263,6 +263,21 @@ export default function Page() {
         });
       }
 
+      const controlChannel = peer.createDataChannel('oai-events');
+      controlChannelRef.current = controlChannel;
+      controlChannel.onopen = () => {
+        const kickoffEvent = {
+          type: 'response.create',
+          response: {
+            modalities: ['audio', 'text'],
+            instructions:
+              'Begin now: greet the candidate, introduce yourself as the interviewer, summarize the role context, then ask the first interview question.'
+          }
+        };
+
+        controlChannel.send(JSON.stringify(kickoffEvent));
+      };
+
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
 
@@ -282,6 +297,7 @@ export default function Page() {
       const { answerSdp } = (await sessionRes.json()) as { answerSdp: string };
       await peer.setRemoteDescription({ type: 'answer', sdp: answerSdp });
       setStatus('connected');
+      await applyAudioOutputDevice(selectedOutputDeviceId);
     } catch (nextError) {
       disconnect();
       setError(nextError instanceof Error ? nextError.message : 'Failed to connect');
@@ -292,6 +308,8 @@ export default function Page() {
     localStreamRef.current?.getTracks().forEach((track) => track.stop());
     localStreamRef.current = null;
     setLocalStream(null);
+    controlChannelRef.current?.close();
+    controlChannelRef.current = null;
     peerRef.current?.close();
     peerRef.current = null;
     if (remoteAudioRef.current) {
@@ -388,6 +406,7 @@ export default function Page() {
           remoteStream={remoteStream}
           localStream={localStream}
           resetSignal={stageResetSignal}
+          sessionStatus={status}
         />
       </div>
     </main>
