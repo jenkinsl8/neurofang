@@ -1,7 +1,11 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AvatarStage } from '../AvatarStage';
+
+afterEach(() => {
+  cleanup();
+});
 
 describe('AvatarStage integration', () => {
   it('renders the embedded 3d interviewer scene when a scene URL exists', async () => {
