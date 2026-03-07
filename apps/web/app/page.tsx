@@ -25,6 +25,67 @@ function traceWebRtc(event: string, details?: Record<string, unknown>) {
   console.debug(`[trace:web][webrtc][${timestamp}] ${event}`, details ?? {});
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function toText(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  return null;
+}
+
+function findTranscript(event: Record<string, unknown>): string | null {
+  const directTranscript = toText(event.transcript) ?? toText(event.delta) ?? toText(event.text);
+  if (directTranscript) {
+    return directTranscript;
+  }
+
+  const item = asRecord(event.item);
+  if (item) {
+    const itemTranscript = toText(item.transcript) ?? toText(item.text);
+    if (itemTranscript) {
+      return itemTranscript;
+    }
+
+    const content = item.content;
+    if (Array.isArray(content)) {
+      for (const entry of content) {
+        const contentEntry = asRecord(entry);
+        if (!contentEntry) {
+          continue;
+        }
+
+        const contentTranscript =
+          toText(contentEntry.transcript) ?? toText(contentEntry.text) ?? toText(contentEntry.delta);
+        if (contentTranscript) {
+          return contentTranscript;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+function describeTrack(track: MediaStreamTrack) {
+  return {
+    id: track.id,
+    kind: track.kind,
+    enabled: track.enabled,
+    muted: track.muted,
+    readyState: track.readyState,
+    label: track.label
+  };
+}
+
 function resolveAssetUrl(path: string | undefined) {
   if (!path) {
     return FALLBACK_THUMBNAIL;
@@ -106,6 +167,9 @@ export default function Page() {
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [stageResetSignal, setStageResetSignal] = useState(0);
+  const aiTranscriptBufferRef = useRef<string>('');
+  const userTranscriptBufferRef = useRef<string>('');
+  const mediaTraceCleanupRef = useRef<(() => void) | null>(null);
 
   const selectedAvatar = useMemo(
     () => avatars.find((avatar) => avatar.id === avatarId) ?? avatars[0],
@@ -147,7 +211,7 @@ export default function Page() {
 
   useEffect(() => {
     const handlePageHide = () => {
-      disconnect();
+      disconnect('pagehide');
     };
 
     window.addEventListener('beforeunload', handlePageHide);
@@ -158,6 +222,35 @@ export default function Page() {
       window.removeEventListener('pagehide', handlePageHide);
     };
   }, []);
+
+
+  function monitorLocalMediaTracks(stream: MediaStream) {
+    mediaTraceCleanupRef.current?.();
+
+    const listeners: Array<() => void> = [];
+    stream.getTracks().forEach((track) => {
+      const onMute = () => traceWebRtc(`media:${track.kind}:muted`, describeTrack(track));
+      const onUnmute = () => traceWebRtc(`media:${track.kind}:unmuted`, describeTrack(track));
+      const onEnded = () => traceWebRtc(`media:${track.kind}:ended`, describeTrack(track));
+
+      track.addEventListener('mute', onMute);
+      track.addEventListener('unmute', onUnmute);
+      track.addEventListener('ended', onEnded);
+
+      listeners.push(() => {
+        track.removeEventListener('mute', onMute);
+        track.removeEventListener('unmute', onUnmute);
+        track.removeEventListener('ended', onEnded);
+      });
+
+      traceWebRtc(`media:${track.kind}:ready`, describeTrack(track));
+    });
+
+    mediaTraceCleanupRef.current = () => {
+      listeners.forEach((cleanup) => cleanup());
+      mediaTraceCleanupRef.current = null;
+    };
+  }
 
   async function connect() {
     try {
@@ -188,6 +281,7 @@ export default function Page() {
       });
       localStreamRef.current = userStream;
       setLocalStream(userStream);
+      monitorLocalMediaTracks(userStream);
       peer.addTransceiver('audio', { direction: 'sendrecv' });
       userStream
         .getAudioTracks()
@@ -246,6 +340,91 @@ export default function Page() {
 
       const controlChannel = peer.createDataChannel('oai-events');
       controlChannelRef.current = controlChannel;
+      controlChannel.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(String(event.data)) as unknown;
+          const parsed = asRecord(payload);
+          if (!parsed) {
+            return;
+          }
+
+          const type = toText(parsed.type);
+          if (!type) {
+            return;
+          }
+
+          if (type === 'input_audio_buffer.speech_started') {
+            userTranscriptBufferRef.current = '';
+            traceWebRtc('interviewer:behavior:listening', { type });
+            return;
+          }
+
+          if (type === 'response.output_audio.started') {
+            aiTranscriptBufferRef.current = '';
+            traceWebRtc('interviewer:behavior:talking', { type });
+            return;
+          }
+
+          if (type === 'response.audio_transcript.delta') {
+            const delta = findTranscript(parsed);
+            if (!delta) {
+              return;
+            }
+
+            aiTranscriptBufferRef.current = `${aiTranscriptBufferRef.current}${delta}`;
+            traceWebRtc('interviewer:speech:delta', {
+              type,
+              text: delta,
+              aggregate: aiTranscriptBufferRef.current
+            });
+            return;
+          }
+
+          if (type === 'response.audio_transcript.done') {
+            const transcript = findTranscript(parsed) ?? aiTranscriptBufferRef.current;
+            if (!transcript) {
+              return;
+            }
+
+            traceWebRtc('interviewer:speech:final', {
+              type,
+              text: transcript
+            });
+            aiTranscriptBufferRef.current = '';
+            return;
+          }
+
+          if (type === 'conversation.item.input_audio_transcription.completed') {
+            const transcript = findTranscript(parsed);
+            if (!transcript) {
+              return;
+            }
+
+            userTranscriptBufferRef.current = transcript;
+            traceWebRtc('candidate:speech:final', {
+              type,
+              text: transcript
+            });
+            return;
+          }
+
+          if (type === 'input_audio_transcription.partial' || type === 'conversation.item.input_audio_transcription.delta') {
+            const delta = findTranscript(parsed);
+            if (!delta) {
+              return;
+            }
+
+            userTranscriptBufferRef.current = `${userTranscriptBufferRef.current}${delta}`;
+            traceWebRtc('candidate:speech:delta', {
+              type,
+              text: delta,
+              aggregate: userTranscriptBufferRef.current
+            });
+          }
+        } catch {
+          // Ignore non-JSON or unknown data channel messages.
+        }
+      };
       controlChannel.onopen = () => {
         const kickoffEvent = {
           type: 'response.create',
@@ -294,18 +473,22 @@ export default function Page() {
       traceWebRtc('connect:error', {
         message: nextError instanceof Error ? nextError.message : 'Failed to connect'
       });
-      disconnect();
+      disconnect('connect-error');
       setError(nextError instanceof Error ? nextError.message : 'Failed to connect');
     }
   }
 
-  function disconnect() {
+  function disconnect(reason = 'internal') {
     traceWebRtc('disconnect:start', {
+      reason,
       hasLocalStream: Boolean(localStreamRef.current),
       hasPeer: Boolean(peerRef.current),
       hasRemoteStream: Boolean(remoteStreamRef.current)
     });
-    localStreamRef.current?.getTracks().forEach((track) => track.stop());
+    localStreamRef.current?.getTracks().forEach((track) => {
+      traceWebRtc(`media:${track.kind}:stop`, describeTrack(track));
+      track.stop();
+    });
     localStreamRef.current = null;
     setLocalStream(null);
     controlChannelRef.current?.close();
@@ -324,7 +507,13 @@ export default function Page() {
     setRemoteStream(null);
     setStageResetSignal((current) => current + 1);
     setStatus('idle');
-    traceWebRtc('disconnect:completed');
+    mediaTraceCleanupRef.current?.();
+    traceWebRtc('disconnect:completed', { reason });
+  }
+
+  function handleDisconnectClick() {
+    traceWebRtc('disconnect:click', { status });
+    disconnect('user-click');
   }
 
   return (
@@ -375,7 +564,7 @@ export default function Page() {
           ) : null}
           <button onClick={connect} disabled={status !== 'idle' || !selectedAvatar}>Connect</button>
           <div style={{ height: 8 }} />
-          <button onClick={disconnect} disabled={status === 'idle'}>Disconnect</button>
+          <button onClick={handleDisconnectClick} disabled={status === 'idle'}>Disconnect</button>
           <div style={{ marginTop: 12 }}>
             <div style={{ fontSize: 13, marginBottom: 6 }}>Camera feed (optional local coaching modules)</div>
             <video ref={localVideoRef} autoPlay muted playsInline className="local-video" />
