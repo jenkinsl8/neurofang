@@ -7,6 +7,7 @@ type Props = {
   unitySceneUrl: string;
   thumbnailPath: string;
   remoteStream?: MediaStream | null;
+  localStream?: MediaStream | null;
   resetSignal?: number;
 };
 
@@ -20,48 +21,36 @@ type UnityStageMessage = {
 };
 
 const FALLBACK_THUMBNAIL = '/avatars/placeholder.svg';
+const SPEAKING_THRESHOLD = 0.12;
 
 export function resolveStageImageSrc(thumbnailPath?: string) {
   return thumbnailPath?.trim() ? thumbnailPath : FALLBACK_THUMBNAIL;
 }
 
-export function buildUnityStageMessage(speechLevel: number): UnityStageMessage {
+export function buildUnityStageMessage(interviewerSpeechLevel: number, candidateSpeechLevel = 0): UnityStageMessage {
+  const isSpeaking = interviewerSpeechLevel > SPEAKING_THRESHOLD;
+
   return {
     type: 'neurofang-stage-state',
     payload: {
-      speechLevel,
-      isSpeaking: speechLevel > 0.12,
-      isListening: speechLevel <= 0.12
+      speechLevel: interviewerSpeechLevel,
+      isSpeaking,
+      isListening: !isSpeaking && candidateSpeechLevel > SPEAKING_THRESHOLD
     }
   };
 }
 
-export function AvatarStage({ unitySceneUrl, thumbnailPath, remoteStream, resetSignal = 0 }: Props) {
-  const [imageSrc, setImageSrc] = useState(resolveStageImageSrc(thumbnailPath));
+function useSpeechLevel(stream: MediaStream | null | undefined, resetSignal: number) {
   const [speechLevel, setSpeechLevel] = useState(0);
-  const [hasEmbedError, setHasEmbedError] = useState(false);
-  const iframeKeyRef = useRef(0);
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const sceneUrl = unitySceneUrl.trim();
-  const hasSceneUrl = sceneUrl.length > 0;
 
   useEffect(() => {
-    setImageSrc(resolveStageImageSrc(thumbnailPath));
-  }, [thumbnailPath]);
-
-  useEffect(() => {
-    iframeKeyRef.current += 1;
-    setHasEmbedError(false);
-  }, [unitySceneUrl, resetSignal]);
-
-  useEffect(() => {
-    if (!remoteStream) {
+    if (!stream) {
       setSpeechLevel(0);
       return;
     }
 
     const audioContext = new AudioContext();
-    const source = audioContext.createMediaStreamSource(remoteStream);
+    const source = audioContext.createMediaStreamSource(stream);
     const analyser = audioContext.createAnalyser();
     analyser.fftSize = 256;
     source.connect(analyser);
@@ -97,17 +86,39 @@ export function AvatarStage({ unitySceneUrl, thumbnailPath, remoteStream, resetS
       analyser.disconnect();
       void audioContext.close();
     };
-  }, [remoteStream, resetSignal]);
+  }, [stream, resetSignal]);
+
+  return speechLevel;
+}
+
+export function AvatarStage({ unitySceneUrl, thumbnailPath, remoteStream, localStream, resetSignal = 0 }: Props) {
+  const [imageSrc, setImageSrc] = useState(resolveStageImageSrc(thumbnailPath));
+  const [hasEmbedError, setHasEmbedError] = useState(false);
+  const iframeKeyRef = useRef(0);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const sceneUrl = unitySceneUrl.trim();
+  const hasSceneUrl = sceneUrl.length > 0;
+  const remoteSpeechLevel = useSpeechLevel(remoteStream, resetSignal);
+  const localSpeechLevel = useSpeechLevel(localStream, resetSignal);
+
+  useEffect(() => {
+    setImageSrc(resolveStageImageSrc(thumbnailPath));
+  }, [thumbnailPath]);
+
+  useEffect(() => {
+    iframeKeyRef.current += 1;
+    setHasEmbedError(false);
+  }, [unitySceneUrl, resetSignal]);
 
   useEffect(() => {
     if (!iframeRef.current?.contentWindow) {
       return;
     }
 
-    const message = buildUnityStageMessage(speechLevel);
+    const message = buildUnityStageMessage(remoteSpeechLevel, localSpeechLevel);
 
     iframeRef.current.contentWindow.postMessage(message, '*');
-  }, [speechLevel]);
+  }, [localSpeechLevel, remoteSpeechLevel]);
 
   return (
     <div className="stage-canvas-wrap" style={{ width: '100%' }}>
@@ -134,7 +145,7 @@ export function AvatarStage({ unitySceneUrl, thumbnailPath, remoteStream, resetS
       ) : null}
       <div style={{ marginTop: 8, fontSize: 12, color: '#93c5fd' }}>
         Voice activity:{' '}
-        <span style={{ color: '#e2e8f0' }}>{Math.round(speechLevel * 100)}%</span>
+        <span style={{ color: '#e2e8f0' }}>interviewer {Math.round(remoteSpeechLevel * 100)}% · candidate {Math.round(localSpeechLevel * 100)}%</span>
       </div>
     </div>
   );
