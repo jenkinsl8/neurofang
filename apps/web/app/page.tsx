@@ -769,7 +769,6 @@ export default function Page() {
         const kickoffEvent = {
           type: 'response.create',
           response: {
-            modalities: ['audio', 'text'],
             instructions:
               'Begin now: greet the candidate, introduce yourself as the interviewer, summarize the role context, then ask the first interview question.'
           }
