@@ -119,6 +119,15 @@ app.post('/session', async (req, res) => {
   const intake = body.intake;
   const difficultyLabel = normalizeDifficulty(intake?.difficulty);
   const personalityLabel = normalizePersonality(intake?.personality);
+  const roleAtCompany = intake?.jobTitle?.trim() || 'Senior Interview Lead';
+  const yearsExperience =
+    intake?.level === 'junior'
+      ? '4'
+      : intake?.level === 'mid'
+        ? '7'
+        : intake?.level === 'senior'
+          ? '11'
+          : '14';
 
   const form = new FormData();
   form.append('sdp', body.sdp);
@@ -146,6 +155,10 @@ app.post('/session', async (req, res) => {
         selectedAvatar
           ? `Interviewer profile: ${selectedAvatar.name}, ${selectedAvatar.gender}, ${selectedAvatar.raceGroup}.`
           : 'Interviewer profile: use a neutral professional tone.',
+        `At the start of the call, immediately deliver a warm spoken introduction as the interviewer: introduce yourself by name, state your role as ${roleAtCompany}, and mention that you have ${yearsExperience} years of experience.`,
+        'Then briefly explain the company mission, the department, and the key team members the candidate would collaborate with.',
+        'Then explain the open role being interviewed for, including major responsibilities and expectations.',
+        'After this introduction, begin the interview immediately by asking the first relevant interview question.',
         `Intake: ${JSON.stringify(intake ?? {})}`
       ].join(' ')
     })

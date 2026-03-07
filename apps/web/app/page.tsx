@@ -73,6 +73,7 @@ export default function Page() {
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [stageResetSignal, setStageResetSignal] = useState(0);
 
   const selectedAvatar = useMemo(
@@ -138,6 +139,8 @@ export default function Page() {
 
       const userStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
       localStreamRef.current = userStream;
+      setLocalStream(userStream);
+      peer.addTransceiver('audio', { direction: 'sendrecv' });
       userStream
         .getAudioTracks()
         .forEach((track) => peer.addTrack(track, userStream));
@@ -216,6 +219,7 @@ export default function Page() {
   function disconnect() {
     localStreamRef.current?.getTracks().forEach((track) => track.stop());
     localStreamRef.current = null;
+    setLocalStream(null);
     peerRef.current?.close();
     peerRef.current = null;
     if (remoteAudioRef.current) {
@@ -290,6 +294,7 @@ export default function Page() {
           unitySceneUrl={resolveAssetUrl(selectedAvatar?.unitySceneUrl)}
           thumbnailPath={resolveAssetUrl(selectedAvatar?.thumbnailPath)}
           remoteStream={remoteStream}
+          localStream={localStream}
           resetSignal={stageResetSignal}
         />
       </div>

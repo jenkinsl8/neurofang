@@ -12,13 +12,24 @@ describe('AvatarStage unit helpers', () => {
     expect(resolveStageImageSrc('/avatars/custom.png')).toBe('/avatars/custom.png');
   });
 
-  it('builds a listening message below the speaking threshold', () => {
-    expect(buildUnityStageMessage(0.12)).toEqual({
+  it('builds a listening message when candidate is talking and interviewer is not', () => {
+    expect(buildUnityStageMessage(0.05, 0.35)).toEqual({
       type: 'neurofang-stage-state',
       payload: {
-        speechLevel: 0.12,
+        speechLevel: 0.05,
         isSpeaking: false,
         isListening: true
+      }
+    });
+  });
+
+  it('does not mark listening when both parties are quiet', () => {
+    expect(buildUnityStageMessage(0.05, 0.06)).toEqual({
+      type: 'neurofang-stage-state',
+      payload: {
+        speechLevel: 0.05,
+        isSpeaking: false,
+        isListening: false
       }
     });
   });
