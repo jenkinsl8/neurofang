@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { AvatarCatalogEntry, InterviewIntake } from '@dominion/shared';
+import { defaultRealtimeIceServers, type AvatarCatalogEntry, type InterviewIntake } from '@dominion/shared';
 
 const AvatarStage = dynamic(
   () => import('../components/AvatarStage').then((module) => module.AvatarStage),
@@ -236,6 +236,71 @@ async function waitForIceGatheringComplete(peer: RTCPeerConnection) {
   });
 }
 
+async function exchangeSessionSdp(
+  peer: RTCPeerConnection,
+  options: {
+    intake: InterviewIntake;
+    avatarId: string | undefined;
+    reason: 'initial' | 'ice-restart';
+  }
+) {
+  traceWebRtc('signaling:exchange:start', {
+    reason: options.reason,
+    signalingState: peer.signalingState,
+    connectionState: peer.connectionState,
+    iceConnectionState: peer.iceConnectionState,
+    iceGatheringState: peer.iceGatheringState
+  });
+
+  const offer = await peer.createOffer(options.reason === 'ice-restart' ? { iceRestart: true } : undefined);
+  traceWebRtc('signaling:offer:created', { reason: options.reason, sdpLength: offer.sdp?.length ?? 0 });
+
+  await peer.setLocalDescription(offer);
+  traceWebRtc('signaling:offer:set-local-description', {
+    reason: options.reason,
+    signalingState: peer.signalingState,
+    iceGatheringState: peer.iceGatheringState
+  });
+
+  traceWebRtc('signaling:ice-gathering:wait:start', { reason: options.reason });
+  await waitForIceGatheringComplete(peer);
+  traceWebRtc('signaling:ice-gathering:wait:done', {
+    reason: options.reason,
+    iceGatheringState: peer.iceGatheringState
+  });
+
+  const localSdp = peer.localDescription?.sdp;
+  traceWebRtc('signaling:offer:ready', { reason: options.reason, sdpLength: localSdp?.length ?? 0 });
+  if (!localSdp) {
+    throw new Error(`Missing local SDP for ${options.reason}`);
+  }
+
+  traceWebRtc('session:request:start', { reason: options.reason, url: `${SERVER_URL}/session` });
+  const sessionRes = await fetch(`${SERVER_URL}/session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sdp: localSdp, intake: options.intake, avatarId: options.avatarId })
+  });
+  traceWebRtc('session:request:response', { reason: options.reason, status: sessionRes.status, ok: sessionRes.ok });
+
+  if (!sessionRes.ok) {
+    const payload = (await sessionRes.json().catch(() => ({ error: 'Unknown server error' }))) as { error?: string };
+    traceWebRtc('session:request:failure', { reason: options.reason, error: payload.error ?? null });
+    throw new Error(payload.error ?? `Session setup failed: ${sessionRes.status}`);
+  }
+
+  const { answerSdp } = (await sessionRes.json()) as { answerSdp: string };
+  traceWebRtc('session:request:success', { reason: options.reason, answerSdpLength: answerSdp.length });
+
+  await peer.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+  traceWebRtc('signaling:answer:set-remote-description', {
+    reason: options.reason,
+    signalingState: peer.signalingState,
+    connectionState: peer.connectionState,
+    iceConnectionState: peer.iceConnectionState
+  });
+}
+
 function AvatarThumbnail({ src, alt, className }: { src: string; alt: string; className: string }) {
   const [imageSrc, setImageSrc] = useState(src);
 
@@ -379,15 +444,36 @@ export default function Page() {
       setCandidateTranscript('');
       setInterviewerTranscript('');
       traceWebRtc('connect:start', { avatarId: selectedAvatar?.id, intake });
-      const peer = new RTCPeerConnection();
+      const peer = new RTCPeerConnection({ iceServers: [...defaultRealtimeIceServers] });
       peerRef.current = peer;
 
       peer.addEventListener('icegatheringstatechange', () => {
         traceWebRtc('ice:gathering-state-change', { state: peer.iceGatheringState });
       });
 
+      let hasRetriedIceRecovery = false;
       peer.addEventListener('iceconnectionstatechange', () => {
-        traceWebRtc('ice:connection-state-change', { state: peer.iceConnectionState });
+        const state = peer.iceConnectionState;
+        traceWebRtc('ice:connection-state-change', { state });
+
+        if ((state === 'disconnected' || state === 'failed') && !hasRetriedIceRecovery) {
+          hasRetriedIceRecovery = true;
+          traceWebRtc('ice:recovery:restart-requested', { state });
+          void (async () => {
+            try {
+              await exchangeSessionSdp(peer, {
+                reason: 'ice-restart',
+                intake,
+                avatarId: selectedAvatar?.id
+              });
+              traceWebRtc('ice:recovery:restart-succeeded');
+            } catch (iceRecoveryError) {
+              traceWebRtc('ice:recovery:restart-failed', {
+                message: iceRecoveryError instanceof Error ? iceRecoveryError.message : 'Unknown error'
+              });
+            }
+          })();
+        }
       });
 
       peer.addEventListener('connectionstatechange', () => {
@@ -612,35 +698,11 @@ export default function Page() {
         controlChannel.send(JSON.stringify(kickoffEvent));
       };
 
-      const offer = await peer.createOffer();
-      await peer.setLocalDescription(offer);
-      traceWebRtc('peer:set-local-description', { sdpLength: offer.sdp?.length ?? 0 });
-      await waitForIceGatheringComplete(peer);
-
-      const localSdp = peer.localDescription?.sdp;
-      traceWebRtc('peer:local-description-ready', { sdpLength: localSdp?.length ?? 0 });
-      if (!localSdp) {
-        throw new Error('Missing local SDP after ICE gathering');
-      }
-
-      traceWebRtc('session:request:start', { url: `${SERVER_URL}/session` });
-      const sessionRes = await fetch(`${SERVER_URL}/session`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sdp: localSdp, intake, avatarId: selectedAvatar?.id })
+      await exchangeSessionSdp(peer, {
+        reason: 'initial',
+        intake,
+        avatarId: selectedAvatar?.id
       });
-
-      if (!sessionRes.ok) {
-        const payload = (await sessionRes.json().catch(() => ({ error: 'Unknown server error' }))) as {
-          error?: string;
-        };
-        throw new Error(payload.error ?? `Session setup failed: ${sessionRes.status}`);
-      }
-
-      const { answerSdp } = (await sessionRes.json()) as { answerSdp: string };
-      traceWebRtc('session:request:success', { answerSdpLength: answerSdp.length });
-      await peer.setRemoteDescription({ type: 'answer', sdp: answerSdp });
-      traceWebRtc('peer:set-remote-description');
       setStatus('connected');
       traceWebRtc('connect:completed');
     } catch (nextError) {

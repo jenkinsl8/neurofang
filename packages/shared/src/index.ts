@@ -33,3 +33,9 @@ export type RealtimeSessionRequest = {
   intake?: InterviewIntake;
   avatarId?: string;
 };
+
+// Public STUN defaults improve post-signaling ICE connectivity when clients are behind NAT.
+export const defaultRealtimeIceServers = [
+  { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+  { urls: 'stun:stun.cloudflare.com:3478' }
+] as const;
