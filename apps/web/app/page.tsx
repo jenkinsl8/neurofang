@@ -12,6 +12,19 @@ const AvatarStage = dynamic(
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:8787';
 const FALLBACK_THUMBNAIL = '/avatars/placeholder.svg';
 
+
+const TRACE_WEBRTC =
+  process.env.NEXT_PUBLIC_TRACE_WEBRTC === '1' || process.env.NEXT_PUBLIC_TRACE_WEBRTC === 'true';
+
+function traceWebRtc(event: string, details?: Record<string, unknown>) {
+  if (!TRACE_WEBRTC) {
+    return;
+  }
+
+  const timestamp = new Date().toISOString();
+  console.debug(`[trace:web][webrtc][${timestamp}] ${event}`, details ?? {});
+}
+
 function resolveAssetUrl(path: string | undefined) {
   if (!path) {
     return FALLBACK_THUMBNAIL;
@@ -39,6 +52,23 @@ const defaultIntake: InterviewIntake = {
   difficulty: 'neutral',
   personality: 'friendly'
 };
+
+async function waitForIceGatheringComplete(peer: RTCPeerConnection) {
+  if (peer.iceGatheringState === 'complete') {
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    const onIceGatheringStateChange = () => {
+      if (peer.iceGatheringState === 'complete') {
+        peer.removeEventListener('icegatheringstatechange', onIceGatheringStateChange);
+        resolve();
+      }
+    };
+
+    peer.addEventListener('icegatheringstatechange', onIceGatheringStateChange);
+  });
+}
 
 function AvatarThumbnail({ src, alt, className }: { src: string; alt: string; className: string }) {
   const [imageSrc, setImageSrc] = useState(src);
@@ -133,12 +163,29 @@ export default function Page() {
     try {
       setError('');
       setStageResetSignal((current) => current + 1);
+      traceWebRtc('connect:start', { avatarId: selectedAvatar?.id, intake });
       const peer = new RTCPeerConnection();
       peerRef.current = peer;
+
+      peer.addEventListener('icegatheringstatechange', () => {
+        traceWebRtc('ice:gathering-state-change', { state: peer.iceGatheringState });
+      });
+
+      peer.addEventListener('iceconnectionstatechange', () => {
+        traceWebRtc('ice:connection-state-change', { state: peer.iceConnectionState });
+      });
+
+      peer.addEventListener('connectionstatechange', () => {
+        traceWebRtc('peer:connection-state-change', { state: peer.connectionState });
+      });
       remoteStreamRef.current = new MediaStream();
       setStatus('connecting');
 
       const userStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      traceWebRtc('media:get-user-media:success', {
+        audioTracks: userStream.getAudioTracks().length,
+        videoTracks: userStream.getVideoTracks().length
+      });
       localStreamRef.current = userStream;
       setLocalStream(userStream);
       peer.addTransceiver('audio', { direction: 'sendrecv' });
@@ -151,6 +198,11 @@ export default function Page() {
       }
 
       peer.ontrack = (event) => {
+        traceWebRtc('peer:ontrack', {
+          trackId: event.track.id,
+          trackKind: event.track.kind,
+          streamCount: event.streams.length
+        });
         const remote = remoteStreamRef.current;
         if (!remote) {
           return;
@@ -209,11 +261,20 @@ export default function Page() {
 
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
+      traceWebRtc('peer:set-local-description', { sdpLength: offer.sdp?.length ?? 0 });
+      await waitForIceGatheringComplete(peer);
 
+      const localSdp = peer.localDescription?.sdp;
+      traceWebRtc('peer:local-description-ready', { sdpLength: localSdp?.length ?? 0 });
+      if (!localSdp) {
+        throw new Error('Missing local SDP after ICE gathering');
+      }
+
+      traceWebRtc('session:request:start', { url: `${SERVER_URL}/session` });
       const sessionRes = await fetch(`${SERVER_URL}/session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sdp: offer.sdp, intake, avatarId: selectedAvatar?.id })
+        body: JSON.stringify({ sdp: localSdp, intake, avatarId: selectedAvatar?.id })
       });
 
       if (!sessionRes.ok) {
@@ -224,15 +285,26 @@ export default function Page() {
       }
 
       const { answerSdp } = (await sessionRes.json()) as { answerSdp: string };
+      traceWebRtc('session:request:success', { answerSdpLength: answerSdp.length });
       await peer.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+      traceWebRtc('peer:set-remote-description');
       setStatus('connected');
+      traceWebRtc('connect:completed');
     } catch (nextError) {
+      traceWebRtc('connect:error', {
+        message: nextError instanceof Error ? nextError.message : 'Failed to connect'
+      });
       disconnect();
       setError(nextError instanceof Error ? nextError.message : 'Failed to connect');
     }
   }
 
   function disconnect() {
+    traceWebRtc('disconnect:start', {
+      hasLocalStream: Boolean(localStreamRef.current),
+      hasPeer: Boolean(peerRef.current),
+      hasRemoteStream: Boolean(remoteStreamRef.current)
+    });
     localStreamRef.current?.getTracks().forEach((track) => track.stop());
     localStreamRef.current = null;
     setLocalStream(null);
@@ -252,6 +324,7 @@ export default function Page() {
     setRemoteStream(null);
     setStageResetSignal((current) => current + 1);
     setStatus('idle');
+    traceWebRtc('disconnect:completed');
   }
 
   return (

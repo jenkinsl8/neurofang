@@ -20,6 +20,18 @@ const PORT = Number(process.env.PORT ?? 8787);
 const allowedDifficulties: InterviewDifficulty[] = ['friendly', 'neutral', 'tough'];
 const allowedPersonalities: InterviewPersonality[] = ['friendly', 'analytical', 'skeptical', 'executive'];
 
+
+const TRACE_WEBRTC = process.env.TRACE_WEBRTC === '1' || process.env.TRACE_WEBRTC === 'true';
+
+function traceWebRtc(event: string, details?: Record<string, unknown>) {
+  if (!TRACE_WEBRTC) {
+    return;
+  }
+
+  const timestamp = new Date().toISOString();
+  console.log(`[trace:server][webrtc][${timestamp}] ${event}`, details ?? {});
+}
+
 function normalizeDifficulty(value: unknown): InterviewDifficulty {
   return allowedDifficulties.includes(value as InterviewDifficulty) ? (value as InterviewDifficulty) : 'neutral';
 }
@@ -104,13 +116,19 @@ app.get('/api/avatars/:avatarId/thumbnail', async (req, res) => {
 });
 
 app.post('/session', async (req, res) => {
+  traceWebRtc('session:request:received', {
+    hasSdp: Boolean((req.body as RealtimeSessionRequest | undefined)?.sdp),
+    avatarId: (req.body as RealtimeSessionRequest | undefined)?.avatarId ?? null
+  });
   const body = req.body as RealtimeSessionRequest;
   if (!body?.sdp) {
+    traceWebRtc('session:request:invalid', { reason: 'missing_sdp' });
     res.status(400).json({ error: 'Missing SDP offer in body.sdp' });
     return;
   }
 
   if (!process.env.OPENAI_API_KEY) {
+    traceWebRtc('session:request:invalid', { reason: 'missing_openai_api_key' });
     res.status(500).json({ error: 'OPENAI_API_KEY is not configured' });
     return;
   }
@@ -166,6 +184,14 @@ app.post('/session', async (req, res) => {
   );
 
   try {
+    traceWebRtc('openai:request:start', {
+      model: process.env.OPENAI_REALTIME_MODEL ?? 'gpt-4o-realtime-preview',
+      voice: process.env.OPENAI_REALTIME_VOICE ?? 'alloy',
+      difficulty: difficultyLabel,
+      personality: personalityLabel,
+      sdpLength: body.sdp.length
+    });
+
     const response = await fetch('https://api.openai.com/v1/realtime/calls', {
       method: 'POST',
       headers: {
@@ -176,17 +202,21 @@ app.post('/session', async (req, res) => {
 
     if (!response.ok) {
       const text = await response.text();
+      traceWebRtc('openai:request:failure', { status: response.status, bodyLength: text.length });
       res.status(response.status).json({ error: text });
       return;
     }
 
     const answerSdp = await response.text();
+    traceWebRtc('openai:request:success', { answerSdpLength: answerSdp.length });
     res.json({ answerSdp });
   } catch (error) {
+    traceWebRtc('openai:request:error', { message: error instanceof Error ? error.message : 'Unknown error' });
     res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 
 app.listen(PORT, () => {
   console.log(`Dominion server listening on http://localhost:${PORT}`);
+  traceWebRtc('server:trace-enabled', { enabled: TRACE_WEBRTC });
 });

@@ -5,6 +5,19 @@ import type { AvatarCatalogEntry, InterviewIntake } from '@dominion/shared';
 
 const SERVER_URL = process.env.EXPO_PUBLIC_SERVER_URL ?? 'http://192.168.1.100:8787';
 
+
+const TRACE_WEBRTC =
+  process.env.EXPO_PUBLIC_TRACE_WEBRTC === '1' || process.env.EXPO_PUBLIC_TRACE_WEBRTC === 'true';
+
+function traceWebRtc(event: string, details?: Record<string, unknown>) {
+  if (!TRACE_WEBRTC) {
+    return;
+  }
+
+  const timestamp = new Date().toISOString();
+  console.debug(`[trace:mobile][webrtc][${timestamp}] ${event}`, details ?? {});
+}
+
 const defaultIntake: InterviewIntake = {
   company: 'Acme',
   jobTitle: 'Mobile Engineer',
@@ -12,6 +25,23 @@ const defaultIntake: InterviewIntake = {
   difficulty: 'neutral',
   personality: 'friendly'
 };
+
+async function waitForIceGatheringComplete(peer: RTCPeerConnection) {
+  if (peer.iceGatheringState === 'complete') {
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    const onIceGatheringStateChange = () => {
+      if (peer.iceGatheringState === 'complete') {
+        peer.removeEventListener('icegatheringstatechange', onIceGatheringStateChange);
+        resolve();
+      }
+    };
+
+    peer.addEventListener('icegatheringstatechange', onIceGatheringStateChange);
+  });
+}
 
 export default function App() {
   const peerRef = useRef<RTCPeerConnection | null>(null);
@@ -48,20 +78,46 @@ export default function App() {
     try {
       setError('');
       setStatus('connecting');
+      traceWebRtc('connect:start', { avatarId: avatar?.id });
       const peer = new RTCPeerConnection();
       peerRef.current = peer;
 
+      peer.addEventListener('icegatheringstatechange', () => {
+        traceWebRtc('ice:gathering-state-change', { state: peer.iceGatheringState });
+      });
+
+      peer.addEventListener('iceconnectionstatechange', () => {
+        traceWebRtc('ice:connection-state-change', { state: peer.iceConnectionState });
+      });
+
+      peer.addEventListener('connectionstatechange', () => {
+        traceWebRtc('peer:connection-state-change', { state: peer.connectionState });
+      });
+
       const stream = await mediaDevices.getUserMedia({ audio: true, video: false });
+      traceWebRtc('media:get-user-media:success', {
+        audioTracks: stream.getAudioTracks().length,
+        videoTracks: stream.getVideoTracks().length
+      });
       localStreamRef.current = stream;
       stream.getTracks().forEach((track) => peer.addTrack(track, stream));
 
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
+      traceWebRtc('peer:set-local-description', { sdpLength: offer.sdp?.length ?? 0 });
+      await waitForIceGatheringComplete(peer);
 
+      const localSdp = peer.localDescription?.sdp;
+      traceWebRtc('peer:local-description-ready', { sdpLength: localSdp?.length ?? 0 });
+      if (!localSdp) {
+        throw new Error('Missing local SDP after ICE gathering');
+      }
+
+      traceWebRtc('session:request:start', { url: `${SERVER_URL}/session` });
       const res = await fetch(`${SERVER_URL}/session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sdp: offer.sdp, avatarId: avatar?.id, intake: defaultIntake })
+        body: JSON.stringify({ sdp: localSdp, avatarId: avatar?.id, intake: defaultIntake })
       });
 
       if (!res.ok) {
@@ -72,20 +128,31 @@ export default function App() {
       }
 
       const { answerSdp } = (await res.json()) as { answerSdp: string };
+      traceWebRtc('session:request:success', { answerSdpLength: answerSdp.length });
       await peer.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+      traceWebRtc('peer:set-remote-description');
       setStatus('connected');
+      traceWebRtc('connect:completed');
     } catch (nextError) {
+      traceWebRtc('connect:error', {
+        message: nextError instanceof Error ? nextError.message : 'Failed to connect'
+      });
       disconnect();
       setError(nextError instanceof Error ? nextError.message : 'Failed to connect');
     }
   }
 
   function disconnect() {
+    traceWebRtc('disconnect:start', {
+      hasLocalStream: Boolean(localStreamRef.current),
+      hasPeer: Boolean(peerRef.current)
+    });
     localStreamRef.current?.getTracks().forEach((track) => track.stop());
     localStreamRef.current = null;
     peerRef.current?.close();
     peerRef.current = null;
     setStatus('idle');
+    traceWebRtc('disconnect:completed');
   }
 
   return (

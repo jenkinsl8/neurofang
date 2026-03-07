@@ -41,19 +41,41 @@ PORT=8787
 AZURE_SPEECH_KEY=
 AZURE_SPEECH_REGION=
 ENABLE_MEDIAPIPE_METRICS=false
+TRACE_WEBRTC=false
 ```
 
 `apps/web/.env.local` (optional override):
 
 ```bash
 NEXT_PUBLIC_SERVER_URL=http://localhost:8787
+NEXT_PUBLIC_TRACE_WEBRTC=false
 ```
 
 `apps/mobile/.env` (required for LAN device testing):
 
 ```bash
 EXPO_PUBLIC_SERVER_URL=http://192.168.1.X:8787
+EXPO_PUBLIC_TRACE_WEBRTC=false
 ```
+
+### Optional trace logging (CLI-enabled)
+
+Enable detailed WebRTC/session trace logs from the command line when debugging connect/disconnect behavior:
+
+```bash
+TRACE_WEBRTC=1 NEXT_PUBLIC_TRACE_WEBRTC=1 npm run dev
+```
+
+For mobile:
+
+```bash
+EXPO_PUBLIC_TRACE_WEBRTC=1 npm run dev:mobile
+```
+
+The logs are emitted as:
+- `[trace:server][webrtc] ...` in `apps/server`
+- `[trace:web][webrtc] ...` in browser devtools console
+- `[trace:mobile][webrtc] ...` in Expo/native logs
 
 ## Run web + server together
 
