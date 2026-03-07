@@ -37,6 +37,7 @@ cp apps/mobile/.env.example apps/mobile/.env
 OPENAI_API_KEY=sk-...
 OPENAI_REALTIME_MODEL=gpt-realtime
 OPENAI_REALTIME_VOICE=alloy
+OPENAI_REALTIME_TIMEOUT_MS=20000
 PORT=8787
 AZURE_SPEECH_KEY=
 AZURE_SPEECH_REGION=
@@ -49,6 +50,7 @@ TRACE_WEBRTC=false
 ```bash
 NEXT_PUBLIC_SERVER_URL=http://localhost:8787
 NEXT_PUBLIC_TRACE_WEBRTC=false
+NEXT_PUBLIC_SESSION_REQUEST_TIMEOUT_MS=25000
 ```
 
 `apps/mobile/.env` (required for LAN device testing):
@@ -56,6 +58,7 @@ NEXT_PUBLIC_TRACE_WEBRTC=false
 ```bash
 EXPO_PUBLIC_SERVER_URL=http://192.168.1.X:8787
 EXPO_PUBLIC_TRACE_WEBRTC=false
+EXPO_PUBLIC_SESSION_REQUEST_TIMEOUT_MS=25000
 ```
 
 ### Optional trace logging (CLI-enabled)

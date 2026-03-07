@@ -25,6 +25,7 @@ const realtimeModel = configuredRealtimeModel === 'gpt-4o-realtime-preview'
   ? 'gpt-realtime'
   : configuredRealtimeModel || 'gpt-realtime';
 const realtimeVoice = process.env.OPENAI_REALTIME_VOICE ?? 'alloy';
+const realtimeCallTimeoutMs = Number(process.env.OPENAI_REALTIME_TIMEOUT_MS ?? 20000);
 
 
 const TRACE_WEBRTC = process.env.TRACE_WEBRTC === '1' || process.env.TRACE_WEBRTC === 'true';
@@ -197,13 +198,21 @@ app.post('/session', async (req, res) => {
     form.append('sdp', body.sdp);
     form.append('session', JSON.stringify(sessionPayload));
 
-    return fetch('https://api.openai.com/v1/realtime/calls', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: form
-    });
+    const requestController = new AbortController();
+    const timeout = setTimeout(() => requestController.abort(), realtimeCallTimeoutMs);
+
+    try {
+      return await fetch('https://api.openai.com/v1/realtime/calls', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+        },
+        body: form,
+        signal: requestController.signal
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
   };
 
   try {
@@ -232,6 +241,14 @@ app.post('/session', async (req, res) => {
     traceWebRtc('openai:request:success', { answerSdpLength: answerSdp.length });
     res.json({ answerSdp });
   } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      traceWebRtc('openai:request:timeout', { timeoutMs: realtimeCallTimeoutMs });
+      res.status(504).json({
+        error: `Timed out while creating realtime session after ${realtimeCallTimeoutMs}ms`
+      });
+      return;
+    }
+
     traceWebRtc('openai:request:error', { message: error instanceof Error ? error.message : 'Unknown error' });
     res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
   }

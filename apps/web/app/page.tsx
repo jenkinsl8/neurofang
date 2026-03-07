@@ -10,6 +10,7 @@ const AvatarStage = dynamic(
 );
 
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:8787';
+const SESSION_REQUEST_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_SESSION_REQUEST_TIMEOUT_MS ?? 25000);
 const FALLBACK_THUMBNAIL = '/avatars/placeholder.svg';
 
 
@@ -313,12 +314,33 @@ async function exchangeSessionSdp(
     throw new Error(`Missing local SDP for ${options.reason}`);
   }
 
-  traceWebRtc('session:request:start', { reason: options.reason, url: `${SERVER_URL}/session` });
-  const sessionRes = await fetch(`${SERVER_URL}/session`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sdp: localSdp, intake: options.intake, avatarId: options.avatarId })
+  traceWebRtc('session:request:start', {
+    reason: options.reason,
+    url: `${SERVER_URL}/session`,
+    timeoutMs: SESSION_REQUEST_TIMEOUT_MS
   });
+  const sessionRequestController = new AbortController();
+  const sessionRequestTimeout = setTimeout(() => sessionRequestController.abort(), SESSION_REQUEST_TIMEOUT_MS);
+
+  let sessionRes: Response;
+  try {
+    sessionRes = await fetch(`${SERVER_URL}/session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sdp: localSdp, intake: options.intake, avatarId: options.avatarId }),
+      signal: sessionRequestController.signal
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      traceWebRtc('session:request:timeout', { reason: options.reason, timeoutMs: SESSION_REQUEST_TIMEOUT_MS });
+      throw new Error(`Session request timed out after ${SESSION_REQUEST_TIMEOUT_MS}ms`);
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(sessionRequestTimeout);
+  }
+
   traceWebRtc('session:request:response', { reason: options.reason, status: sessionRes.status, ok: sessionRes.ok });
 
   if (!sessionRes.ok) {
