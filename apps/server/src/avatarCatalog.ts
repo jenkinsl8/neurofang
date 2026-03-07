@@ -3,7 +3,7 @@ import type { AvatarCatalogEntry } from '@dominion/shared';
 type Seed = Omit<AvatarCatalogEntry, 'thumbnailPath'>;
 
 const unitySceneBase = '/unity/interviewer/index.html';
-const thumbnailProxy = (id: string) => `/api/avatars/${id}/thumbnail`;
+const thumbnailAssetPath = (id: string) => `/avatars/${id}.svg`;
 
 const seeds: Seed[] = [
   { id: 'ava-01', name: 'Noah', gender: 'male', raceGroup: 'black', makeHumanModelId: 'mh-noah-v1', unitySceneUrl: `${unitySceneBase}?avatar=ava-01` },
@@ -26,5 +26,5 @@ const seeds: Seed[] = [
 
 export const avatarCatalog: AvatarCatalogEntry[] = seeds.map((seed) => ({
   ...seed,
-  thumbnailPath: thumbnailProxy(seed.id)
+  thumbnailPath: thumbnailAssetPath(seed.id)
 }));
