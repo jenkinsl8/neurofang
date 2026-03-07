@@ -15,6 +15,9 @@ const FALLBACK_THUMBNAIL = '/avatars/placeholder.svg';
 
 const TRACE_WEBRTC =
   process.env.NEXT_PUBLIC_TRACE_WEBRTC === '1' || process.env.NEXT_PUBLIC_TRACE_WEBRTC === 'true';
+const MICROPHONE_INPUT_LEVEL_TRACE_INTERVAL_MS = Number(
+  process.env.NEXT_PUBLIC_MIC_INPUT_LEVEL_TRACE_INTERVAL_MS ?? '0'
+);
 
 function traceWebRtc(event: string, details?: Record<string, unknown>) {
   if (!TRACE_WEBRTC) {
@@ -23,6 +26,29 @@ function traceWebRtc(event: string, details?: Record<string, unknown>) {
 
   const timestamp = new Date().toISOString();
   console.debug(`[trace:web][webrtc][${timestamp}] ${event}`, details ?? {});
+}
+
+function pickPayloadFields(
+  payload: Record<string, unknown>,
+  keys: Array<'status' | 'error' | 'output' | 'usage'>
+) {
+  return keys.reduce<Record<string, unknown>>((acc, key) => {
+    if (key in payload) {
+      acc[key] = payload[key];
+    }
+    return acc;
+  }, {});
+}
+
+function shouldTraceRealtimePayload(type: string) {
+  return (
+    type === 'response.created' ||
+    type === 'response.done' ||
+    type === 'response.output_audio.started' ||
+    type === 'response.output_audio.done' ||
+    type.startsWith('response.audio_transcript.') ||
+    type.startsWith('response.output_text.')
+  );
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -134,6 +160,7 @@ function monitorMicrophoneInput(stream: MediaStream): MicrophoneTraceController 
   let recentPeak = 0;
   let speaking = false;
   let segmentStartedAt = 0;
+  let lastInputLevelLogAt = 0;
 
   traceWebRtc('microphone:monitor:started', {
     sampleRate: audioContext.sampleRate,
@@ -153,11 +180,19 @@ function monitorMicrophoneInput(stream: MediaStream): MicrophoneTraceController 
     const rms = Math.sqrt(sumSquares / pcm.length);
     recentPeak = Math.max(recentPeak, rms);
 
-    traceWebRtc('microphone:input:level', {
-      rms: Number(rms.toFixed(4)),
-      peak: Number(recentPeak.toFixed(4)),
-      speechDetected: rms >= speechFloor
-    });
+    const now = Date.now();
+    const shouldLogInputLevel =
+      MICROPHONE_INPUT_LEVEL_TRACE_INTERVAL_MS <= 0 ||
+      now - lastInputLevelLogAt >= MICROPHONE_INPUT_LEVEL_TRACE_INTERVAL_MS;
+    if (shouldLogInputLevel) {
+      traceWebRtc('microphone:input:level', {
+        rms: Number(rms.toFixed(4)),
+        peak: Number(recentPeak.toFixed(4)),
+        speechDetected: rms >= speechFloor,
+        intervalMs: MICROPHONE_INPUT_LEVEL_TRACE_INTERVAL_MS
+      });
+      lastInputLevelLogAt = now;
+    }
 
     if (rms >= speechFloor && !speaking) {
       speaking = true;
@@ -570,6 +605,16 @@ export default function Page() {
           }
 
           traceWebRtc('datachannel:event', { type });
+
+          if (shouldTraceRealtimePayload(type)) {
+            traceWebRtc('datachannel:event:payload', {
+              type,
+              payload: {
+                ...pickPayloadFields(parsed, ['status', 'error', 'output', 'usage']),
+                full: parsed
+              }
+            });
+          }
 
           if (
             type.startsWith('input_audio_') ||
