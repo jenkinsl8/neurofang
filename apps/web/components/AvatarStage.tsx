@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import React from 'react';
 
 type Props = {
   unitySceneUrl: string;
