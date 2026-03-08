@@ -64,7 +64,15 @@ const checks = [
     validate(output) {
       const hasAvailableDevice = output
         .split("\n")
-        .some((line) => /^\s{2,}[A-Za-z0-9].+\([A-F0-9-]+\)\s*\(.*\)$/.test(line));
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .some((line) => {
+          const hasDeviceState = /\((Booted|Shutdown|Creating|Shutting Down)\)$/.test(line);
+          const hasUuid = /\([0-9a-fA-F-]{36}\)/.test(line);
+          const isUnavailable = /\(unavailable,/i.test(line);
+
+          return hasDeviceState && hasUuid && !isUnavailable;
+        });
 
       return hasAvailableDevice;
     },
