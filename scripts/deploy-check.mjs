@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { collectProxyWarnings, sanitizeProxyEnv } from './build-doctor.mjs';
 
 const MAX_TYPECHECK_ATTEMPTS = 3;
+const MAX_TEST_ATTEMPTS = 2;
 
 function runCommand(command, args, { env = process.env } = {}) {
   const result = spawnSync(command, args, {
@@ -39,6 +40,18 @@ export function analyzeTypecheckFailure(output) {
     missingDependencyTypes,
     installPermissionsIssue
   };
+}
+
+export function analyzeRuntimeFailure(output) {
+  const missingDependencies = includesAny(output, [
+    /Cannot find module '[^']+'/i,
+    /command not found/i,
+    /ENOENT/i,
+    /npm error code E403/i,
+    /403 Forbidden/i
+  ]);
+
+  return { missingDependencies };
 }
 
 function runBootstrapFix() {
@@ -92,9 +105,29 @@ function runTypecheckWithHealing() {
   return false;
 }
 
-function runTests() {
-  console.log('[deploy-check] Running test suite.');
-  return runCommand('npm', ['run', 'test']).status === 0;
+function runTestsWithHealing() {
+  for (let attempt = 1; attempt <= MAX_TEST_ATTEMPTS; attempt += 1) {
+    console.log(`[deploy-check] Test run attempt ${attempt}/${MAX_TEST_ATTEMPTS}.`);
+    const result = runCommand('npm', ['run', 'test']);
+
+    if (result.status === 0) {
+      return true;
+    }
+
+    const combinedOutput = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
+    const diagnosis = analyzeRuntimeFailure(combinedOutput);
+
+    if (!diagnosis.missingDependencies || attempt === MAX_TEST_ATTEMPTS) {
+      return false;
+    }
+
+    console.warn('[deploy-check] Test failure appears environment-related. Attempting self-heal.');
+    if (!runBootstrapFix()) {
+      return false;
+    }
+  }
+
+  return false;
 }
 
 export function main() {
@@ -114,7 +147,7 @@ export function main() {
     process.exit(1);
   }
 
-  if (!runTests()) {
+  if (!runTestsWithHealing()) {
     process.exit(1);
   }
 

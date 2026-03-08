@@ -36,7 +36,9 @@ npm run deploy:check
 What this command does automatically:
 - validates Node.js/npm versions
 - detects problematic proxy settings that break npm installs
-- installs dependencies if `node_modules` is missing
+- installs dependencies if `node_modules` is missing (with timeout safeguards)
+- creates missing env files from `.env.example` templates
+- self-heals typecheck/test failures caused by missing dependencies by re-running bootstrap
 - runs workspace typechecks
 - runs unit tests
 - runs build-health test (`npm run build`) so deployments fail fast when build breaks
