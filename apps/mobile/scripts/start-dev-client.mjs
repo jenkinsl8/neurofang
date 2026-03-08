@@ -194,6 +194,11 @@ function runIosBuildWithDiagnostics() {
     console.error('      cd apps/mobile/ios && pod install --repo-update');
     console.error('   2) Open ios/*.xcworkspace in Xcode and build once to inspect signing/runtime errors.');
     console.error('   3) If this began after an SDK/RN upgrade, delete apps/mobile/ios and prebuild again.');
+    console.error('   4) If you hit `EXReactRootViewFactory.h ... RCTDevMenuConfiguration ... expected a type`,');
+    console.error('      regenerate iOS artifacts and pods from scratch:');
+    console.error('      rm -rf apps/mobile/ios');
+    console.error('      npm run ios:prebuild -w @dominion/mobile');
+    console.error('      cd apps/mobile/ios && pod install --repo-update');
 
     process.exit(verboseAttempt.status || 1);
   }
