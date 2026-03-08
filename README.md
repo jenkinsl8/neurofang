@@ -99,7 +99,7 @@ npm run android -w @dominion/mobile
 npm run ios -w @dominion/mobile
 ```
 
-Before the iOS build starts, the mobile workspace now runs a prerequisite check (`npm run ios:check -w @dominion/mobile`) for Xcode CLI tools, `simctl`, and CocoaPods.
+Before the iOS build starts, the mobile workspace now runs a prerequisite check (`npm run ios:check -w @dominion/mobile`) and a clean iOS prebuild (`npm run ios:prebuild -w @dominion/mobile`) so native Podfile changes from Expo/RN upgrades are regenerated before `pod install` (the script uses `CI=1` to suppress Expo prebuild prompts).
 
 ## Mobile troubleshooting
 
@@ -124,6 +124,14 @@ Before the iOS build starts, the mobile workspace now runs a prerequisite check 
   brew install cocoapods
   ```
 
+- If `expo run:ios` fails with "Unable to find a specification for ReactAppDependencyProvider depended upon by expo-dev-launcher" during `pod install`, regenerate the iOS project and reinstall pods:
+
+  ```bash
+  npm run ios:prebuild -w @dominion/mobile
+  cd apps/mobile/ios && pod install --repo-update
+  ```
+
+  This usually means the generated iOS native project is stale relative to your Expo/React Native package versions.
 - You can still develop with a physical iOS device or Android while iOS simulator tooling is unavailable.
 
 ## OpenAI Realtime Unified Interface flow
