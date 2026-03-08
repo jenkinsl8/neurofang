@@ -189,7 +189,7 @@ app.post('/session', async (req, res) => {
         input: {
           turn_detection: {
             type: 'server_vad',
-            create_response: false,
+            create_response: true,
             interrupt_response: true
           }
         },
