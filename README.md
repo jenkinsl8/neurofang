@@ -115,6 +115,13 @@ The mobile `ios` script now performs a clean iOS prebuild (`npm run ios:prebuild
 - If Expo prints `The expo-dev-client package is installed, but a development build is not installed ... Launching in Expo Go` and then `xcrun simctl openurl ... code: 60`, the simulator is trying to open an `exp://` URL in Expo Go after timing out. Build/install the development client first (`npm run ios -w @dominion/mobile`), then start Metro in dev-client mode (`npm run dev:mobile`) and open the app from the installed `dominionmobile://` development build.
 - If you see `The app entry point named "main" was not registered`, the JS bundle crashed before `registerRootComponent` (commonly from loading native modules in Expo Go). Launch the custom dev client instead of scanning the QR in Expo Go.
 - If `npm run ios:check -w @dominion/mobile` reports missing prerequisites or a React Native version mismatch, run `npm install` at repo root, then regenerate native files with `npm run ios:prebuild -w @dominion/mobile`, and rerun the command.
+- If `npm run start:dev-client -w @dominion/mobile -- --iosSimulator` fails with `xcodebuild exited with error code 65`, rerun with verbose logs to surface the native compiler/signing error: `npx expo run:ios --no-bundler --verbose`. Then refresh generated native files/pods:
+
+  ```bash
+  npm run ios:prebuild -w @dominion/mobile
+  cd apps/mobile/ios && pod install --repo-update
+  ```
+
 - If `npm run dev:mobile` works but `npm run ios -w @dominion/mobile` fails with `Unable to run simctl` / `xcrun simctl ... code: 69`, your Xcode CLI tooling is not usable on that machine.
 - Fix locally by resetting and selecting Xcode command line tools, then launching Xcode once to accept licenses:
 
