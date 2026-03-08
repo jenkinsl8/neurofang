@@ -102,7 +102,7 @@ npm run start:dev-client -w @dominion/mobile -- --iosSimulator
 
 The mobile `ios` script now performs a clean iOS prebuild (`npm run ios:prebuild -w @dominion/mobile`) before `expo run:ios` so native Podfile changes from Expo/RN upgrades are regenerated before `pod install` (the script uses `CI=1` to suppress Expo prebuild prompts). Run `npm run ios:check -w @dominion/mobile` manually when you need to verify local iOS prerequisites. Both `ios:check` and `ios:prebuild` verify your installed `react-native` version matches `apps/mobile/package.json` to catch stale `node_modules` after dependency bumps.
 
-`npm run dev:mobile` now runs a startup preflight that verifies `expo-dev-client` and `react-native` are installed/synced before Metro starts. Passing `--iosSimulator` now runs `ios:check` and `expo run:ios --no-bundler` first so the local simulator development build is compiled/installed before Metro starts, then automatically opens iOS in dev-client mode with the app scheme. Use `--cleanPrebuild` when you need to regenerate native iOS artifacts before the build (for example after Expo/RN upgrades or Pod header errors). Passing `--androidSimulator` similarly runs `expo run:android --no-bundler` before Metro and opens Android in dev-client mode.
+`npm run dev:mobile` now runs a startup preflight that verifies `expo-dev-client` and `react-native` are installed/synced before Metro starts. Passing `--iosSimulator` now runs `ios:check` and `npx expo run:ios --no-bundler` first (with `EXPO_DEBUG=1` injected by the script) so the local simulator development build is compiled/installed with extra diagnostics before Metro starts, then automatically opens iOS in dev-client mode with the app scheme. Use `--cleanPrebuild` when you need to regenerate native iOS artifacts before the build (for example after Expo/RN upgrades or Pod header errors). Passing `--androidSimulator` similarly runs `expo run:android --no-bundler` before Metro and opens Android in dev-client mode.
 
 ## Mobile troubleshooting
 
@@ -123,7 +123,7 @@ The mobile `ios` script now performs a clean iOS prebuild (`npm run ios:prebuild
   cd apps/mobile/ios && pod install --repo-update
   ```
 
-- If `npm run start:dev-client -w @dominion/mobile -- --iosSimulator` fails with `xcodebuild exited with error code 65`, rerun with verbose logs to surface the native compiler/signing error: `npx expo run:ios --no-bundler --verbose`. If errors mention stale/generated Expo headers (for example `EXReactRootViewFactory.h` / `RCTDevMenuConfiguration expected a type`), rerun with a clean prebuild and refresh pods:
+- If `npm run start:dev-client -w @dominion/mobile -- --iosSimulator` fails with `xcodebuild exited with error code 65`, rerun with Expo debug logs to surface the native compiler/signing error: `EXPO_DEBUG=1 npx expo run:ios --no-bundler`. If errors mention stale/generated Expo headers (for example `EXReactRootViewFactory.h` / `RCTDevMenuConfiguration expected a type`), rerun with a clean prebuild and refresh pods:
 
   ```bash
   npm run ios:prebuild -w @dominion/mobile
