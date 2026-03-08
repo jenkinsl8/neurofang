@@ -103,7 +103,7 @@ Before the iOS build starts, the mobile workspace now runs a prerequisite check 
 
 ## Mobile troubleshooting
 
-- If `npm run ios:check -w @dominion/mobile` reports missing prerequisites or a React Native version mismatch, run `npm install` at repo root and rerun the command.
+- If `npm run ios:check -w @dominion/mobile` reports missing prerequisites or a React Native version mismatch, run `npm install` at repo root, then regenerate native files with `npm run ios:prebuild -w @dominion/mobile`, and rerun the command.
 - If `npm run dev:mobile` works but `npm run ios -w @dominion/mobile` fails with `Unable to run simctl` / `xcrun simctl ... code: 69`, your Xcode CLI tooling is not usable on that machine.
 - Fix locally by resetting and selecting Xcode command line tools, then launching Xcode once to accept licenses:
 
@@ -132,6 +132,14 @@ Before the iOS build starts, the mobile workspace now runs a prerequisite check 
   ```
 
   This usually means the generated iOS native project is stale relative to your Expo/React Native package versions.
+- If you see Xcode project warnings about unknown PBX UUIDs during pod install/codegen (for example `attempted to initialize an object with an unknown UUID`), your generated iOS project is likely corrupted/stale. Regenerate it from scratch:
+
+  ```bash
+  rm -rf apps/mobile/ios
+  npm run ios:prebuild -w @dominion/mobile
+  cd apps/mobile/ios && pod install --repo-update
+  ```
+
 - You can still develop with a physical iOS device or Android while iOS simulator tooling is unavailable.
 
 ## OpenAI Realtime Unified Interface flow
