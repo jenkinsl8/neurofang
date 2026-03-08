@@ -4,20 +4,21 @@
   "private": true,
   "main": "index.ts",
   "scripts": {
-    "start": "expo start --host lan",
+    "start": "expo start --dev-client --host lan",
     "start:dev-client": "expo start --dev-client --host lan",
     "android": "expo run:android",
     "ios": "npm run ios:check && npm run ios:prebuild && expo run:ios",
     "ios:prebuild": "node ./scripts/check-mobile-deps.mjs && CI=1 expo prebuild --platform ios --clean",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "ios:check": "node ./scripts/check-ios-toolchain.mjs"
+    "ios:check": "node ./scripts/check-ios-toolchain.mjs",
+    "start:expo-go": "expo start --host lan"
   },
   "dependencies": {
     "@dominion/shared": "0.0.1",
-    "expo": "~54.0.0",
-    "expo-dev-client": "~6.0.0",
+    "expo": "~55.0.0",
+    "expo-dev-client": "~6.1.0",
     "react": "19.1.0",
-    "react-native": "0.81.4",
+    "react-native": "0.82.0",
     "react-native-webrtc": "^124.0.4"
   },
   "devDependencies": {
