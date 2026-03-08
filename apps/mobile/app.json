@@ -1,6 +1,10 @@
 {
   "expo": {
     "name": "DominionMobile",
-    "slug": "dominion-mobile"
+    "slug": "dominion-mobile",
+    "scheme": "dominionmobile",
+    "plugins": [
+      "expo-dev-client"
+    ]
   }
 }
