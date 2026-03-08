@@ -93,7 +93,8 @@ This starts:
 ## Run mobile dev client
 
 ```bash
-npm run dev:mobile
+npm run dev:mobile            # Expo Go workflow
+npm run start:dev-client -w @dominion/mobile  # custom dev client workflow
 npm run android -w @dominion/mobile
 # or
 npm run ios -w @dominion/mobile
@@ -103,6 +104,8 @@ Before the iOS build starts, the mobile workspace now runs a prerequisite check 
 
 ## Mobile troubleshooting
 
+- Expo Go on iOS only supports the latest SDK. This repo now targets **Expo SDK 54** (`expo@~54`, `react-native@0.81`); after pulling changes, run `npm install` at the repo root before launching mobile.
+- If you see `TurboModuleRegistry.getEnforcing(...): 'PlatformConstants' could not be found`, you likely launched a **dev-client** bundle in Expo Go (or vice versa). Use `npm run dev:mobile` for Expo Go, and `npm run start:dev-client -w @dominion/mobile` only with a rebuilt custom dev client for this SDK.
 - If `npm run ios:check -w @dominion/mobile` reports missing prerequisites or a React Native version mismatch, run `npm install` at repo root, then regenerate native files with `npm run ios:prebuild -w @dominion/mobile`, and rerun the command.
 - If `npm run dev:mobile` works but `npm run ios -w @dominion/mobile` fails with `Unable to run simctl` / `xcrun simctl ... code: 69`, your Xcode CLI tooling is not usable on that machine.
 - Fix locally by resetting and selecting Xcode command line tools, then launching Xcode once to accept licenses:
