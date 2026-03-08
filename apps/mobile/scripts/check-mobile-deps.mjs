@@ -2,9 +2,21 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 
-const projectRoot = path.resolve(process.cwd());
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = path.resolve(scriptDir, "..");
+const workspaceRoot = path.resolve(projectRoot, "..", "..");
 const requireFromProject = createRequire(path.join(projectRoot, "package.json"));
+const requireFromWorkspaceRoot = createRequire(path.join(workspaceRoot, "package.json"));
+
+function resolvePackageJson(packageName) {
+  try {
+    return requireFromProject.resolve(`${packageName}/package.json`);
+  } catch {
+    return requireFromWorkspaceRoot.resolve(`${packageName}/package.json`);
+  }
+}
 
 function verifyDependency({ packageName, expectedVersion, retryHint }) {
   if (!expectedVersion) {
@@ -13,7 +25,7 @@ function verifyDependency({ packageName, expectedVersion, retryHint }) {
   }
 
   try {
-    const installedPackageJson = requireFromProject.resolve(`${packageName}/package.json`);
+    const installedPackageJson = resolvePackageJson(packageName);
     const installedVersion = JSON.parse(readFileSync(installedPackageJson, "utf8")).version;
     const normalizedExpected = String(expectedVersion).replace(/^[~^]/, "");
 
