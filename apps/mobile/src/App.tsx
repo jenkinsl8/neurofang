@@ -3,10 +3,10 @@ import { Button, SafeAreaView, Text, View } from 'react-native';
 import Constants from 'expo-constants';
 import type { AvatarCatalogEntry, InterviewIntake } from '@dominion/shared';
 
-const defaultRealtimeIceServers = [
+const defaultRealtimeIceServers: RTCIceServer[] = [
   { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
   { urls: 'stun:stun.cloudflare.com:3478' }
-] as const;
+];
 
 const SERVER_URL = process.env.EXPO_PUBLIC_SERVER_URL ?? 'http://192.168.1.100:8787';
 const SESSION_REQUEST_TIMEOUT_MS = Number(process.env.EXPO_PUBLIC_SESSION_REQUEST_TIMEOUT_MS ?? 25000);
@@ -14,6 +14,7 @@ const IS_EXPO_GO = Constants.appOwnership === 'expo';
 
 type WebRtcModule = typeof import('react-native-webrtc');
 type PeerConnection = InstanceType<WebRtcModule['RTCPeerConnection']>;
+type RealtimeMediaStream = InstanceType<WebRtcModule['MediaStream']>;
 
 function getWebRtcModule(): WebRtcModule | null {
   if (IS_EXPO_GO) {
@@ -51,12 +52,12 @@ async function waitForIceGatheringComplete(peer: PeerConnection) {
   await new Promise<void>((resolve) => {
     const onIceGatheringStateChange = () => {
       if (peer.iceGatheringState === 'complete') {
-        peer.removeEventListener('icegatheringstatechange', onIceGatheringStateChange);
+        peer.onicegatheringstatechange = null;
         resolve();
       }
     };
 
-    peer.addEventListener('icegatheringstatechange', onIceGatheringStateChange);
+    peer.onicegatheringstatechange = onIceGatheringStateChange;
 
     // Guard against a race where ICE reaches `complete` between the initial check
     // and listener registration, which would otherwise leave this promise unresolved.
@@ -152,7 +153,7 @@ async function exchangeSessionSdp(
 
 export default function App() {
   const peerRef = useRef<PeerConnection | null>(null);
-  const localStreamRef = useRef<MediaStream | null>(null);
+  const localStreamRef = useRef<RealtimeMediaStream | null>(null);
   const [status, setStatus] = useState('idle');
   const [avatar, setAvatar] = useState<AvatarCatalogEntry | null>(null);
   const [error, setError] = useState<string>('');
@@ -192,15 +193,15 @@ export default function App() {
       }
 
       const { RTCPeerConnection, mediaDevices } = webRtc;
-      const peer = new RTCPeerConnection({ iceServers: [...defaultRealtimeIceServers] });
+      const peer = new RTCPeerConnection({ iceServers: defaultRealtimeIceServers });
       peerRef.current = peer;
 
-      peer.addEventListener('icegatheringstatechange', () => {
+      peer.onicegatheringstatechange = () => {
         traceWebRtc('ice:gathering-state-change', { state: peer.iceGatheringState });
-      });
+      };
 
       let hasRetriedIceRecovery = false;
-      peer.addEventListener('iceconnectionstatechange', () => {
+      peer.oniceconnectionstatechange = () => {
         const state = peer.iceConnectionState;
         traceWebRtc('ice:connection-state-change', { state });
 
@@ -222,11 +223,11 @@ export default function App() {
             }
           })();
         }
-      });
+      };
 
-      peer.addEventListener('connectionstatechange', () => {
+      peer.onconnectionstatechange = () => {
         traceWebRtc('peer:connection-state-change', { state: peer.connectionState });
-      });
+      };
 
       const stream = await mediaDevices.getUserMedia({ audio: true, video: false });
       traceWebRtc('media:get-user-media:success', {
