@@ -62,6 +62,59 @@ function readExpoScheme() {
   return appJson?.expo?.scheme ?? null;
 }
 
+function readBundleIdentifiers() {
+  const appJsonPath = path.join(projectRoot, 'app.json');
+
+  if (!existsSync(appJsonPath)) {
+    return [];
+  }
+
+  const appJson = JSON.parse(readFileSync(appJsonPath, 'utf8'));
+  const explicitBundleId = appJson?.expo?.ios?.bundleIdentifier;
+  if (typeof explicitBundleId === 'string' && explicitBundleId.length > 0) {
+    return [explicitBundleId];
+  }
+
+  const slug = appJson?.expo?.slug;
+  if (typeof slug === 'string' && slug.length > 0) {
+    return [`com.anonymous.${slug}`];
+  }
+
+  return [];
+}
+
+function hasBootedIosSimulator() {
+  try {
+    const output = execSync('xcrun simctl list devices booted --json', {
+      cwd: projectRoot,
+      stdio: ['ignore', 'pipe', 'pipe']
+    }).toString();
+    const parsed = JSON.parse(output);
+    const devices = Object.values(parsed.devices ?? {}).flat();
+    return devices.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function isInstalledOnBootedSimulator(bundleIdentifiers) {
+  if (bundleIdentifiers.length === 0) {
+    return true;
+  }
+
+  try {
+    const output = execSync('xcrun simctl listapps booted --json', {
+      cwd: projectRoot,
+      stdio: ['ignore', 'pipe', 'pipe']
+    }).toString();
+    const parsed = JSON.parse(output);
+    const installedBundleIds = new Set(Object.keys(parsed?.apps ?? {}));
+    return bundleIdentifiers.some((bundleId) => installedBundleIds.has(bundleId));
+  } catch {
+    return false;
+  }
+}
+
 function run(command) {
   try {
     execSync(command, { stdio: 'inherit', cwd: projectRoot });
@@ -83,6 +136,15 @@ if (iosSimulator && androidSimulator) {
 }
 
 run('node ./scripts/check-mobile-deps.mjs');
+
+const bundleIdentifiers = readBundleIdentifiers();
+
+if (!iosSimulator && !androidSimulator && process.platform === 'darwin' && hasBootedIosSimulator() && !isInstalledOnBootedSimulator(bundleIdentifiers)) {
+  const expectedBundle = bundleIdentifiers[0] ?? 'your iOS bundle identifier';
+  console.error(`\n❌ No iOS development build is installed for ${expectedBundle}.`);
+  console.error('   Build/install it once with: npm run start:dev-client -w @dominion/mobile -- --iosSimulator');
+  process.exit(1);
+}
 
 if (iosSimulator) {
   console.log('\n🔧 Preparing iOS development client (simulator build + install)...');
