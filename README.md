@@ -99,8 +99,11 @@ npm run android -w @dominion/mobile
 npm run ios -w @dominion/mobile
 ```
 
+Before the iOS build starts, the mobile workspace now runs a prerequisite check (`npm run ios:check -w @dominion/mobile`) for Xcode CLI tools, `simctl`, and CocoaPods.
+
 ## Mobile troubleshooting
 
+- If `npm run ios:check -w @dominion/mobile` reports missing prerequisites, fix those first and rerun the command.
 - If `npm run dev:mobile` works but `npm run ios -w @dominion/mobile` fails with `Unable to run simctl` / `xcrun simctl ... code: 69`, your Xcode CLI tooling is not usable on that machine.
 - Fix locally by resetting and selecting Xcode command line tools, then launching Xcode once to accept licenses:
 
@@ -113,6 +116,14 @@ npm run ios -w @dominion/mobile
   ```
 
   If `xcrun simctl list devices` still fails, open Xcode → **Settings** → **Platforms** and install at least one iOS simulator runtime.
+- If CocoaPods installation fails during `expo run:ios`, install it manually and verify `pod --version` succeeds:
+
+  ```bash
+  sudo gem install cocoapods --no-document
+  # or
+  brew install cocoapods
+  ```
+
 - You can still develop with a physical iOS device or Android while iOS simulator tooling is unavailable.
 
 ## OpenAI Realtime Unified Interface flow
