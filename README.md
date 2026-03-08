@@ -102,7 +102,17 @@ npm run ios -w @dominion/mobile
 ## Mobile troubleshooting
 
 - If `npm run dev:mobile` works but `npm run ios -w @dominion/mobile` fails with `Unable to run simctl` / `xcrun simctl ... code: 69`, your Xcode CLI tooling is not usable on that machine.
-- Fix locally by installing/selecting Xcode command line tools (`xcode-select --install`, then `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`) and launching Xcode once to accept licenses.
+- Fix locally by resetting and selecting Xcode command line tools, then launching Xcode once to accept licenses:
+
+  ```bash
+  sudo xcode-select --reset
+  xcode-select --install
+  sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+  sudo xcodebuild -license accept
+  xcrun simctl list devices
+  ```
+
+  If `xcrun simctl list devices` still fails, open Xcode → **Settings** → **Platforms** and install at least one iOS simulator runtime.
 - You can still develop with a physical iOS device or Android while iOS simulator tooling is unavailable.
 
 ## OpenAI Realtime Unified Interface flow
