@@ -101,7 +101,7 @@ npm run android -w @dominion/mobile
 npm run ios -w @dominion/mobile
 ```
 
-Before the iOS build starts, the mobile workspace now runs a prerequisite check (`npm run ios:check -w @dominion/mobile`) and a clean iOS prebuild (`npm run ios:prebuild -w @dominion/mobile`) so native Podfile changes from Expo/RN upgrades are regenerated before `pod install` (the script uses `CI=1` to suppress Expo prebuild prompts). Both `ios:check` and `ios:prebuild` now verify your installed `react-native` version matches `apps/mobile/package.json` to catch stale `node_modules` after dependency bumps.
+The mobile `ios` script now performs a clean iOS prebuild (`npm run ios:prebuild -w @dominion/mobile`) before `expo run:ios` so native Podfile changes from Expo/RN upgrades are regenerated before `pod install` (the script uses `CI=1` to suppress Expo prebuild prompts). Run `npm run ios:check -w @dominion/mobile` manually when you need to verify local iOS prerequisites. Both `ios:check` and `ios:prebuild` verify your installed `react-native` version matches `apps/mobile/package.json` to catch stale `node_modules` after dependency bumps.
 
 ## Mobile troubleshooting
 
