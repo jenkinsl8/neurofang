@@ -152,6 +152,20 @@ function run(command, description) {
     }
     console.error(`   ↳ message: ${message}`);
 
+    const isIosBuildCommand = command.includes('expo run:ios');
+    if (isIosBuildCommand && status === 65) {
+      console.error('');
+      console.error('🧭 xcodebuild exited with code 65 (generic iOS build failure).');
+      console.error('   Try the following in order to get a more actionable error:');
+      console.error('   1) Re-run with verbose native logs:');
+      console.error('      npx expo run:ios --no-bundler --verbose');
+      console.error('   2) Ensure Pods are fresh after dependency updates:');
+      console.error('      npm run ios:prebuild -w @dominion/mobile');
+      console.error('      cd apps/mobile/ios && pod install --repo-update');
+      console.error('   3) Open ios/*.xcworkspace in Xcode and build once to inspect signing/runtime errors.');
+      console.error('   4) If this began after an SDK/RN upgrade, delete apps/mobile/ios and prebuild again.');
+    }
+
     if (error && typeof error === 'object' && 'status' in error) {
       process.exit(status);
     }
