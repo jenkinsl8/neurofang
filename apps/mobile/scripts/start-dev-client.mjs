@@ -148,8 +148,9 @@ if (!iosSimulator && !androidSimulator && process.platform === 'darwin' && hasBo
 
 if (iosSimulator) {
   console.log('\n🔧 Preparing iOS development client (simulator build + install)...');
-  run('npm run ios:check');
-  run('npm run prebuild:ios');
+  // Run the toolchain check directly so failures are reported once from this command.
+  run('node ./scripts/check-ios-toolchain.mjs');
+  run('CI=1 npx expo prebuild --platform ios --clean');
   run('npx expo run:ios --no-bundler');
 }
 
