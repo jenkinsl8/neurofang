@@ -27,7 +27,7 @@ describe('AvatarStage integration', () => {
           payload: {
             speechLevel: 0,
             isSpeaking: false,
-            isListening: true
+            isListening: false
           }
         },
         '*'
