@@ -2,8 +2,9 @@
   "expo": {
     "name": "DominionMobile",
     "slug": "dominion-mobile",
+    "scheme": "dominionmobile",
     "plugins": [
-      "react-native-webrtc"
+      "expo-dev-client"
     ]
   }
 }
