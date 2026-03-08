@@ -155,11 +155,11 @@ function printRunFailure(error, command, description) {
 }
 
 function run(command, description, options = {}) {
-  const { exitOnError = true } = options;
+  const { exitOnError = true, env = {} } = options;
   logDiagnostic(`Running ${description ?? 'command'}`, command);
 
   try {
-    execSync(command, { stdio: 'inherit', cwd: projectRoot });
+    execSync(command, { stdio: 'inherit', cwd: projectRoot, env: { ...process.env, ...env } });
     logDiagnostic(`Completed ${description ?? 'command'}`);
     return { ok: true, status: 0 };
   } catch (error) {
@@ -174,8 +174,8 @@ function run(command, description, options = {}) {
 }
 
 function runIosBuildWithDiagnostics() {
-  const baseCommand = 'EXPO_DEBUG=1 npx expo run:ios --no-bundler --verbose';
-  const baseAttempt = run(baseCommand, 'Expo iOS simulator build/install', { exitOnError: false });
+  const baseCommand = 'npx expo run:ios --no-bundler';
+  const baseAttempt = run(baseCommand, 'Expo iOS simulator build/install', { exitOnError: false, env: { EXPO_DEBUG: '1' } });
 
   if (baseAttempt.ok) {
     return;
@@ -184,9 +184,9 @@ function runIosBuildWithDiagnostics() {
   if (baseAttempt.status === 65) {
     console.error('');
     console.error('🧭 xcodebuild exited with code 65 (generic iOS build failure).');
-    console.error('   Automatically retrying with extra Expo/Xcode diagnostics to surface a root cause...');
-    const verboseCommand = 'EXPO_DEBUG=1 npx expo run:ios --no-bundler --verbose';
-    const verboseAttempt = run(verboseCommand, 'Expo iOS simulator build/install (verbose retry)', { exitOnError: false });
+    console.error('   Automatically retrying with Expo debug diagnostics to surface a root cause...');
+    const verboseCommand = 'npx expo run:ios --no-bundler';
+    const verboseAttempt = run(verboseCommand, 'Expo iOS simulator build/install (debug retry)', { exitOnError: false, env: { EXPO_DEBUG: '1' } });
 
     if (verboseAttempt.ok) {
       return;
