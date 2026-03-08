@@ -99,11 +99,11 @@ npm run android -w @dominion/mobile
 npm run ios -w @dominion/mobile
 ```
 
-Before the iOS build starts, the mobile workspace now runs a prerequisite check (`npm run ios:check -w @dominion/mobile`) for Xcode CLI tools, `simctl`, and CocoaPods.
+Before the iOS build starts, the mobile workspace now runs a prerequisite check (`npm run ios:check -w @dominion/mobile`) and a clean iOS prebuild (`npm run ios:prebuild -w @dominion/mobile`) so native Podfile changes from Expo/RN upgrades are regenerated before `pod install` (the script uses `CI=1` to suppress Expo prebuild prompts). The prerequisite check also verifies your installed `react-native` version matches `apps/mobile/package.json` to catch stale `node_modules` after dependency bumps.
 
 ## Mobile troubleshooting
 
-- If `npm run ios:check -w @dominion/mobile` reports missing prerequisites, fix those first and rerun the command.
+- If `npm run ios:check -w @dominion/mobile` reports missing prerequisites or a React Native version mismatch, run `npm install` at repo root, then regenerate native files with `npm run ios:prebuild -w @dominion/mobile`, and rerun the command.
 - If `npm run dev:mobile` works but `npm run ios -w @dominion/mobile` fails with `Unable to run simctl` / `xcrun simctl ... code: 69`, your Xcode CLI tooling is not usable on that machine.
 - Fix locally by resetting and selecting Xcode command line tools, then launching Xcode once to accept licenses:
 
@@ -122,6 +122,22 @@ Before the iOS build starts, the mobile workspace now runs a prerequisite check 
   sudo gem install cocoapods --no-document
   # or
   brew install cocoapods
+  ```
+
+- If `expo run:ios` fails with "Unable to find a specification for ReactAppDependencyProvider depended upon by expo-dev-launcher" during `pod install`, regenerate the iOS project and reinstall pods:
+
+  ```bash
+  npm run ios:prebuild -w @dominion/mobile
+  cd apps/mobile/ios && pod install --repo-update
+  ```
+
+  This usually means the generated iOS native project is stale relative to your Expo/React Native package versions.
+- If you see Xcode project warnings about unknown PBX UUIDs during pod install/codegen (for example `attempted to initialize an object with an unknown UUID`), your generated iOS project is likely corrupted/stale. Regenerate it from scratch:
+
+  ```bash
+  rm -rf apps/mobile/ios
+  npm run ios:prebuild -w @dominion/mobile
+  cd apps/mobile/ios && pod install --repo-update
   ```
 
 - You can still develop with a physical iOS device or Android while iOS simulator tooling is unavailable.
