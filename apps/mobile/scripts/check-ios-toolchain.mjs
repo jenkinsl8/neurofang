@@ -6,6 +6,37 @@ import { createRequire } from "node:module";
 
 const projectRoot = path.resolve(process.cwd());
 const requireFromProject = createRequire(path.join(projectRoot, "package.json"));
+const debugEnabled = process.argv.includes("--debug") || process.env.DEBUG_IOS_TOOLCHAIN === "1";
+
+function printDebug(message) {
+  if (debugEnabled) {
+    console.error(`[debug] ${message}`);
+  }
+}
+
+function runCheckCommand(command) {
+  printDebug(`Running command: ${command}`);
+
+  return execSync(command, {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+}
+
+function printCapturedOutput(label, output) {
+  if (!output) {
+    return;
+  }
+
+  const text = String(output).trim();
+  if (!text) {
+    return;
+  }
+
+  for (const line of text.split("\n")) {
+    console.error(`   ${label}: ${line}`);
+  }
+}
 
 const checks = [
   {
@@ -61,16 +92,37 @@ let hasFailure = false;
 
 for (const check of checks) {
   try {
-    const output = execSync(check.command, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    const output = runCheckCommand(check.command);
 
     if (typeof check.validate === "function" && !check.validate(output)) {
-      throw new Error("Validation failed");
+      throw new Error(`Validation failed for command output from: ${check.command}`);
     }
 
     console.log(`✅ ${check.name} detected`);
-  } catch {
+    printDebug(`Check passed: ${check.name}`);
+  } catch (error) {
     hasFailure = true;
     console.error(`❌ Missing or broken: ${check.name}`);
+
+    if (error instanceof Error) {
+      const commandFailed = error;
+      if (typeof commandFailed.message === "string" && commandFailed.message.length > 0) {
+        console.error(`   Reason: ${commandFailed.message}`);
+      }
+
+      if (typeof commandFailed.stack === "string") {
+        printDebug(commandFailed.stack);
+      }
+
+      if (typeof commandFailed === "object" && commandFailed !== null) {
+        const errorWithStreams = commandFailed;
+        printCapturedOutput("stdout", errorWithStreams.stdout);
+        printCapturedOutput("stderr", errorWithStreams.stderr);
+      }
+    } else {
+      console.error(`   Reason: ${String(error)}`);
+    }
+
     for (const line of check.fix) {
       console.error(`   ${line}`);
     }
@@ -118,6 +170,9 @@ if (existsSync(path.join(projectRoot, "ios"))) {
 }
 
 if (hasFailure) {
+  if (!debugEnabled) {
+    console.error("Tip: rerun with DEBUG_IOS_TOOLCHAIN=1 for additional diagnostics.");
+  }
   console.error("\nUnable to continue iOS build until the issues above are fixed.");
   process.exit(1);
 }
