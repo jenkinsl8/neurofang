@@ -16,6 +16,31 @@ type WebRtcModule = typeof import('react-native-webrtc');
 type PeerConnection = InstanceType<WebRtcModule['RTCPeerConnection']>;
 type RealtimeMediaStream = InstanceType<WebRtcModule['MediaStream']>;
 
+
+type PeerEventName = 'icegatheringstatechange' | 'iceconnectionstatechange' | 'connectionstatechange';
+
+function attachPeerEventListener(peer: PeerConnection, eventName: PeerEventName, listener: () => void) {
+  const peerWithEvents = peer as PeerConnection & {
+    addEventListener?: (event: string, listener: () => void) => void;
+    removeEventListener?: (event: string, listener: () => void) => void;
+  };
+
+  if (typeof peerWithEvents.addEventListener === 'function') {
+    peerWithEvents.addEventListener(eventName, listener);
+    return () => {
+      if (typeof peerWithEvents.removeEventListener === 'function') {
+        peerWithEvents.removeEventListener(eventName, listener);
+      }
+    };
+  }
+
+  const fallbackHandlerKey = `on${eventName}`;
+  (peer as unknown as Record<string, unknown>)[fallbackHandlerKey] = listener;
+  return () => {
+    (peer as unknown as Record<string, unknown>)[fallbackHandlerKey] = null;
+  };
+}
+
 function getWebRtcModule(): WebRtcModule | null {
   if (IS_EXPO_GO) {
     return null;
@@ -52,12 +77,16 @@ async function waitForIceGatheringComplete(peer: PeerConnection) {
   await new Promise<void>((resolve) => {
     const onIceGatheringStateChange = () => {
       if (peer.iceGatheringState === 'complete') {
-        peer.onicegatheringstatechange = null;
+        detachIceGatheringStateChange();
         resolve();
       }
     };
 
-    peer.onicegatheringstatechange = onIceGatheringStateChange;
+    const detachIceGatheringStateChange = attachPeerEventListener(
+      peer,
+      'icegatheringstatechange',
+      onIceGatheringStateChange
+    );
 
     // Guard against a race where ICE reaches `complete` between the initial check
     // and listener registration, which would otherwise leave this promise unresolved.
@@ -196,12 +225,12 @@ export default function App() {
       const peer = new RTCPeerConnection({ iceServers: defaultRealtimeIceServers });
       peerRef.current = peer;
 
-      peer.onicegatheringstatechange = () => {
+      attachPeerEventListener(peer, 'icegatheringstatechange', () => {
         traceWebRtc('ice:gathering-state-change', { state: peer.iceGatheringState });
-      };
+      });
 
       let hasRetriedIceRecovery = false;
-      peer.oniceconnectionstatechange = () => {
+      attachPeerEventListener(peer, 'iceconnectionstatechange', () => {
         const state = peer.iceConnectionState;
         traceWebRtc('ice:connection-state-change', { state });
 
@@ -223,11 +252,11 @@ export default function App() {
             }
           })();
         }
-      };
+      });
 
-      peer.onconnectionstatechange = () => {
+      attachPeerEventListener(peer, 'connectionstatechange', () => {
         traceWebRtc('peer:connection-state-change', { state: peer.connectionState });
-      };
+      });
 
       const stream = await mediaDevices.getUserMedia({ audio: true, video: false });
       traceWebRtc('media:get-user-media:success', {
