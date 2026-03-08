@@ -5,6 +5,7 @@
     "scheme": "dominionmobile",
     "plugins": [
       "expo-dev-client"
-    ]
+    ],
+    "entryPoint": "./index.ts"
   }
 }
