@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { analyzeTypecheckFailure } from './deploy-check.mjs';
+import { analyzeRuntimeFailure, analyzeTypecheckFailure } from './deploy-check.mjs';
 
 test('detects missing dependency/type failures', () => {
   const output = `error TS2307: Cannot find module 'express' or its corresponding type declarations.\nerror TS2688: Cannot find type definition file for 'react'.`;
@@ -27,4 +27,14 @@ test('keeps non-environment failures as non-healable', () => {
     missingDependencyTypes: false,
     installPermissionsIssue: false
   });
+});
+
+test('detects runtime failures caused by missing dependencies', () => {
+  const output = "Error: Cannot find module 'vitest'";
+  assert.deepEqual(analyzeRuntimeFailure(output), { missingDependencies: true });
+});
+
+test('ignores runtime failures that are not environment related', () => {
+  const output = 'Expected true to equal false';
+  assert.deepEqual(analyzeRuntimeFailure(output), { missingDependencies: false });
 });
