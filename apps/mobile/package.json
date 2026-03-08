@@ -6,7 +6,8 @@
   "scripts": {
     "start": "expo start --dev-client --non-interactive",
     "android": "expo run:android",
-    "ios": "npm run ios:check && expo run:ios",
+    "ios": "npm run ios:check && npm run ios:prebuild && expo run:ios",
+    "ios:prebuild": "expo prebuild --platform ios --clean --non-interactive",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "ios:check": "node ./scripts/check-ios-toolchain.mjs"
   },
