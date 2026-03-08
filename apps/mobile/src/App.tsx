@@ -1,11 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, SafeAreaView, Text, View } from 'react-native';
-import { mediaDevices, RTCPeerConnection } from 'react-native-webrtc';
+import Constants from 'expo-constants';
 import { defaultRealtimeIceServers, type AvatarCatalogEntry, type InterviewIntake } from '@dominion/shared';
 
 const SERVER_URL = process.env.EXPO_PUBLIC_SERVER_URL ?? 'http://192.168.1.100:8787';
 const SESSION_REQUEST_TIMEOUT_MS = Number(process.env.EXPO_PUBLIC_SESSION_REQUEST_TIMEOUT_MS ?? 25000);
+const IS_EXPO_GO = Constants.appOwnership === 'expo';
 
+type WebRtcModule = typeof import('react-native-webrtc');
+type PeerConnection = InstanceType<WebRtcModule['RTCPeerConnection']>;
+
+function getWebRtcModule(): WebRtcModule | null {
+  if (IS_EXPO_GO) {
+    return null;
+  }
+
+  return require('react-native-webrtc') as WebRtcModule;
+}
 
 const TRACE_WEBRTC =
   process.env.EXPO_PUBLIC_TRACE_WEBRTC === '1' || process.env.EXPO_PUBLIC_TRACE_WEBRTC === 'true';
@@ -27,7 +38,7 @@ const defaultIntake: InterviewIntake = {
   personality: 'friendly'
 };
 
-async function waitForIceGatheringComplete(peer: RTCPeerConnection) {
+async function waitForIceGatheringComplete(peer: PeerConnection) {
   if (peer.iceGatheringState === 'complete') {
     return;
   }
@@ -49,7 +60,7 @@ async function waitForIceGatheringComplete(peer: RTCPeerConnection) {
 }
 
 async function exchangeSessionSdp(
-  peer: RTCPeerConnection,
+  peer: PeerConnection,
   options: {
     intake: InterviewIntake;
     avatarId: string | undefined;
@@ -135,7 +146,7 @@ async function exchangeSessionSdp(
 }
 
 export default function App() {
-  const peerRef = useRef<RTCPeerConnection | null>(null);
+  const peerRef = useRef<PeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const [status, setStatus] = useState('idle');
   const [avatar, setAvatar] = useState<AvatarCatalogEntry | null>(null);
@@ -170,6 +181,12 @@ export default function App() {
       setError('');
       setStatus('connecting');
       traceWebRtc('connect:start', { avatarId: avatar?.id });
+      const webRtc = getWebRtcModule();
+      if (!webRtc) {
+        throw new Error('Expo Go is not supported for WebRTC. Use `npm run start:dev-client -w @dominion/mobile` and open the custom development build.');
+      }
+
+      const { RTCPeerConnection, mediaDevices } = webRtc;
       const peer = new RTCPeerConnection({ iceServers: [...defaultRealtimeIceServers] });
       peerRef.current = peer;
 
@@ -247,6 +264,11 @@ export default function App() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#111827', padding: 20 }}>
       <Text style={{ color: 'white', fontSize: 24, marginBottom: 10 }}>Dominion Mobile MVP</Text>
       <Text style={{ color: '#cbd5e1', marginBottom: 8 }}>Status: {status}</Text>
+      {IS_EXPO_GO ? (
+        <Text style={{ color: '#fde68a', marginBottom: 8 }}>
+          Running in Expo Go: microphone WebRTC is disabled because react-native-webrtc requires a custom development build.
+        </Text>
+      ) : null}
       {error ? <Text style={{ color: '#fca5a5', marginBottom: 8 }}>{error}</Text> : null}
       <Text style={{ color: '#cbd5e1', marginBottom: 20 }}>
         Interviewer: {avatar ? `${avatar.name} (${avatar.gender}, ${avatar.raceGroup})` : 'Loading...'}
