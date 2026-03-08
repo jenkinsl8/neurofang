@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, SafeAreaView, Text, View } from 'react-native';
 import Constants from 'expo-constants';
-import { defaultRealtimeIceServers, type AvatarCatalogEntry, type InterviewIntake } from '@dominion/shared';
+import type { AvatarCatalogEntry, InterviewIntake } from '@dominion/shared';
+
+const defaultRealtimeIceServers = [
+  { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+  { urls: 'stun:stun.cloudflare.com:3478' }
+] as const;
 
 const SERVER_URL = process.env.EXPO_PUBLIC_SERVER_URL ?? 'http://192.168.1.100:8787';
 const SESSION_REQUEST_TIMEOUT_MS = Number(process.env.EXPO_PUBLIC_SESSION_REQUEST_TIMEOUT_MS ?? 25000);
