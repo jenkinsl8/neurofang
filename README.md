@@ -93,15 +93,16 @@ This starts:
 ## Run mobile dev client
 
 ```bash
-npm run dev:mobile            # start Metro in dev-client mode (recommended default)
+npm run dev:mobile                                # start Metro in dev-client mode
+npm run dev:mobile -- --iosSimulator            # verify + build/install iOS dev client, then start Metro
+npm run dev:mobile -- --androidSimulator        # build/install Android dev client, then start Metro
 # or explicitly:
-npm run start:dev-client -w @dominion/mobile
-npm run android -w @dominion/mobile
-# or
-npm run ios -w @dominion/mobile
+npm run start:dev-client -w @dominion/mobile -- --iosSimulator
 ```
 
 The mobile `ios` script now performs a clean iOS prebuild (`npm run ios:prebuild -w @dominion/mobile`) before `expo run:ios` so native Podfile changes from Expo/RN upgrades are regenerated before `pod install` (the script uses `CI=1` to suppress Expo prebuild prompts). Run `npm run ios:check -w @dominion/mobile` manually when you need to verify local iOS prerequisites. Both `ios:check` and `ios:prebuild` verify your installed `react-native` version matches `apps/mobile/package.json` to catch stale `node_modules` after dependency bumps.
+
+`npm run dev:mobile` now runs a startup preflight that verifies `expo-dev-client` and `react-native` are installed/synced before Metro starts. Passing `--iosSimulator` now runs `ios:check`, `prebuild:ios`, and `expo run:ios --no-bundler` first so the local simulator development build is compiled/installed before Metro starts, then automatically opens iOS in dev-client mode with the app scheme. Passing `--androidSimulator` similarly runs `expo run:android --no-bundler` before Metro and opens Android in dev-client mode.
 
 ## Mobile troubleshooting
 
