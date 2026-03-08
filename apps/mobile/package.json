@@ -4,8 +4,8 @@
   "private": true,
   "main": "index.ts",
   "scripts": {
-    "start": "expo start --non-interactive",
-    "start:dev-client": "expo start --dev-client --non-interactive",
+    "start": "expo start --host lan",
+    "start:dev-client": "expo start --dev-client --host lan",
     "android": "expo run:android",
     "ios": "npm run ios:check && npm run ios:prebuild && expo run:ios",
     "ios:prebuild": "node ./scripts/check-mobile-deps.mjs && CI=1 expo prebuild --platform ios --clean",

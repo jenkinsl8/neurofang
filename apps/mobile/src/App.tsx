@@ -183,7 +183,7 @@ export default function App() {
       traceWebRtc('connect:start', { avatarId: avatar?.id });
       const webRtc = getWebRtcModule();
       if (!webRtc) {
-        throw new Error('Expo Go is not supported for WebRTC. Use `npm run start:dev-client -w @dominion/mobile` and open the custom development build.');
+        throw new Error('Expo Go cannot run this project (SDK/native modules mismatch). Build/open the custom development client with `npm run ios -w @dominion/mobile` or `npm run android -w @dominion/mobile`, then start Metro with `npm run start:dev-client -w @dominion/mobile`.');
       }
 
       const { RTCPeerConnection, mediaDevices } = webRtc;
@@ -266,7 +266,7 @@ export default function App() {
       <Text style={{ color: '#cbd5e1', marginBottom: 8 }}>Status: {status}</Text>
       {IS_EXPO_GO ? (
         <Text style={{ color: '#fde68a', marginBottom: 8 }}>
-          Running in Expo Go: microphone WebRTC is disabled because react-native-webrtc requires a custom development build.
+          Running in Expo Go: this project uses native modules (react-native-webrtc), so Expo Go from the App Store is unsupported/incompatible. Open the custom development build instead.
         </Text>
       ) : null}
       {error ? <Text style={{ color: '#fca5a5', marginBottom: 8 }}>{error}</Text> : null}
