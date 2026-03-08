@@ -5,6 +5,7 @@ import path from 'node:path';
 const REQUIRED_NODE_MAJOR = 20;
 const REQUIRED_NPM_MAJOR = 10;
 const PLACEHOLDER_PROXY_SNIPPET = 'proxy:8080';
+const INSTALL_TIMEOUT_MS = 120000;
 
 export function parseMajor(versionText) {
   const match = versionText.trim().match(/v?(\d+)/);
@@ -80,8 +81,18 @@ export function ensureDependenciesInstalled({ fix, rootDir }) {
     cwd: rootDir,
     encoding: 'utf-8',
     env: installEnv,
-    stdio: 'inherit'
+    stdio: 'inherit',
+    timeout: INSTALL_TIMEOUT_MS
   });
+
+  if (result.error?.code === 'ETIMEDOUT') {
+    return {
+      ok: false,
+      changed: false,
+      message:
+        'Automatic dependency installation timed out. Check npm registry/proxy access and rerun `npm run deploy:check`.'
+    };
+  }
 
   if (result.status !== 0) {
     return {
