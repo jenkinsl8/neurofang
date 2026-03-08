@@ -7,7 +7,7 @@
     "start": "expo start --dev-client --non-interactive",
     "android": "expo run:android",
     "ios": "npm run ios:check && npm run ios:prebuild && expo run:ios",
-    "ios:prebuild": "expo prebuild --platform ios --clean --non-interactive",
+    "ios:prebuild": "CI=1 expo prebuild --platform ios --clean",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "ios:check": "node ./scripts/check-ios-toolchain.mjs"
   },

@@ -99,7 +99,7 @@ npm run android -w @dominion/mobile
 npm run ios -w @dominion/mobile
 ```
 
-Before the iOS build starts, the mobile workspace now runs a prerequisite check (`npm run ios:check -w @dominion/mobile`) and a clean iOS prebuild (`npm run ios:prebuild -w @dominion/mobile`) so native Podfile changes from Expo/RN upgrades are regenerated before `pod install`.
+Before the iOS build starts, the mobile workspace now runs a prerequisite check (`npm run ios:check -w @dominion/mobile`) and a clean iOS prebuild (`npm run ios:prebuild -w @dominion/mobile`) so native Podfile changes from Expo/RN upgrades are regenerated before `pod install` (the script uses `CI=1` to suppress Expo prebuild prompts).
 
 ## Mobile troubleshooting
 
