@@ -28,6 +28,24 @@ const checks = [
     ]
   },
   {
+    name: "available iOS simulator devices",
+    command: "xcrun simctl list devices available iOS",
+    validate(output) {
+      const hasAvailableDevice = output
+        .split("\n")
+        .some((line) => /^\s{2,}[A-Za-z0-9].+\([A-F0-9-]+\)\s*\(.*\)$/.test(line));
+
+      return hasAvailableDevice;
+    },
+    fix: [
+      "Create or download an iOS Simulator runtime/device:",
+      "  1. Open Xcode -> Settings -> Platforms and install an iOS runtime.",
+      "  2. Open Simulator.app once and verify at least one iPhone device exists.",
+      "If Expo reports \"CommandError: No iOS devices available in Simulator.app\",",
+      "this is usually the missing runtime/device state above."
+    ]
+  },
+  {
     name: "CocoaPods CLI",
     command: "pod --version",
     fix: [
@@ -43,7 +61,12 @@ let hasFailure = false;
 
 for (const check of checks) {
   try {
-    execSync(check.command, { stdio: "ignore" });
+    const output = execSync(check.command, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+
+    if (typeof check.validate === "function" && !check.validate(output)) {
+      throw new Error("Validation failed");
+    }
+
     console.log(`✅ ${check.name} detected`);
   } catch {
     hasFailure = true;
