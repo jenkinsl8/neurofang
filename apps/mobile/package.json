@@ -5,7 +5,7 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start --dev-client --host lan",
-    "start:dev-client": "expo start --dev-client --host lan",
+    "start:dev-client": "node ./scripts/start-dev-client.mjs",
     "android": "expo run:android",
     "ios": "npm run prebuild:ios && expo run:ios",
     "dev:check": "npm --prefix \"$(git rev-parse --show-toplevel)\" run dev:check",
