@@ -128,50 +128,77 @@ function isInstalledOnBootedSimulator(bundleIdentifiers) {
   }
 }
 
-function run(command, description) {
+function printRunFailure(error, command, description) {
+  const status = error && typeof error === 'object' && 'status' in error
+    ? Number(error.status) || 1
+    : 1;
+  const signal = error && typeof error === 'object' && 'signal' in error
+    ? error.signal
+    : null;
+  const message = error instanceof Error ? error.message : String(error);
+
+  console.error(`❌ [start:dev-client] ${description ?? 'command'} failed.`);
+  console.error(`   ↳ command: ${command}`);
+  console.error(`   ↳ cwd: ${projectRoot}`);
+  console.error(`   ↳ exit status: ${status}`);
+  if (signal) {
+    console.error(`   ↳ signal: ${signal}`);
+  }
+  console.error(`   ↳ message: ${message}`);
+
+  return { status, signal, message };
+}
+
+function run(command, description, options = {}) {
+  const { exitOnError = true } = options;
   logDiagnostic(`Running ${description ?? 'command'}`, command);
 
   try {
     execSync(command, { stdio: 'inherit', cwd: projectRoot });
     logDiagnostic(`Completed ${description ?? 'command'}`);
+    return { ok: true, status: 0 };
   } catch (error) {
-    const status = error && typeof error === 'object' && 'status' in error
-      ? Number(error.status) || 1
-      : 1;
-    const signal = error && typeof error === 'object' && 'signal' in error
-      ? error.signal
-      : null;
-    const message = error instanceof Error ? error.message : String(error);
+    const failure = printRunFailure(error, command, description);
 
-    console.error(`❌ [start:dev-client] ${description ?? 'command'} failed.`);
-    console.error(`   ↳ command: ${command}`);
-    console.error(`   ↳ cwd: ${projectRoot}`);
-    console.error(`   ↳ exit status: ${status}`);
-    if (signal) {
-      console.error(`   ↳ signal: ${signal}`);
-    }
-    console.error(`   ↳ message: ${message}`);
-
-    const isIosBuildCommand = command.includes('expo run:ios');
-    if (isIosBuildCommand && status === 65) {
-      console.error('');
-      console.error('🧭 xcodebuild exited with code 65 (generic iOS build failure).');
-      console.error('   Try the following in order to get a more actionable error:');
-      console.error('   1) Re-run with verbose native logs:');
-      console.error('      npx expo run:ios --no-bundler --verbose');
-      console.error('   2) Ensure Pods are fresh after dependency updates:');
-      console.error('      npm run ios:prebuild -w @dominion/mobile');
-      console.error('      cd apps/mobile/ios && pod install --repo-update');
-      console.error('   3) Open ios/*.xcworkspace in Xcode and build once to inspect signing/runtime errors.');
-      console.error('   4) If this began after an SDK/RN upgrade, delete apps/mobile/ios and prebuild again.');
+    if (!exitOnError) {
+      return { ok: false, ...failure };
     }
 
-    if (error && typeof error === 'object' && 'status' in error) {
-      process.exit(status);
-    }
-
-    process.exit(1);
+    process.exit(failure.status || 1);
   }
+}
+
+function runIosBuildWithDiagnostics() {
+  const baseCommand = 'npx expo run:ios --no-bundler';
+  const baseAttempt = run(baseCommand, 'Expo iOS simulator build/install', { exitOnError: false });
+
+  if (baseAttempt.ok) {
+    return;
+  }
+
+  if (baseAttempt.status === 65) {
+    console.error('');
+    console.error('🧭 xcodebuild exited with code 65 (generic iOS build failure).');
+    console.error('   Automatically retrying with verbose native logs to surface a root cause...');
+    const verboseCommand = 'npx expo run:ios --no-bundler --verbose';
+    const verboseAttempt = run(verboseCommand, 'Expo iOS simulator build/install (verbose retry)', { exitOnError: false });
+
+    if (verboseAttempt.ok) {
+      return;
+    }
+
+    console.error('');
+    console.error('   Suggested follow-up steps:');
+    console.error('   1) Ensure Pods are fresh after dependency updates:');
+    console.error('      npm run ios:prebuild -w @dominion/mobile');
+    console.error('      cd apps/mobile/ios && pod install --repo-update');
+    console.error('   2) Open ios/*.xcworkspace in Xcode and build once to inspect signing/runtime errors.');
+    console.error('   3) If this began after an SDK/RN upgrade, delete apps/mobile/ios and prebuild again.');
+
+    process.exit(verboseAttempt.status || 1);
+  }
+
+  process.exit(baseAttempt.status || 1);
 }
 
 const iosSimulator = readFlag('iosSimulator');
@@ -207,7 +234,7 @@ if (iosSimulator) {
   // Run the toolchain check directly so failures are reported once from this command.
   run('node ./scripts/check-ios-toolchain.mjs', 'iOS toolchain check');
   run('CI=1 npx expo prebuild --platform ios --clean', 'Expo iOS prebuild');
-  run('npx expo run:ios --no-bundler', 'Expo iOS simulator build/install');
+  runIosBuildWithDiagnostics();
 }
 
 if (androidSimulator) {
