@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev -w @dominion/server\" \"npm run dev -w @dominion/web\"",
-    "dev:mobile": "npm run start -w @dominion/mobile",
+    "dev:mobile": "npm run start:dev-client -w @dominion/mobile",
     "build": "npm run build -w @dominion/shared && npm run build -w @dominion/server && npm run build -w @dominion/web",
     "typecheck": "npm run typecheck -ws",
     "test": "npm run test -w @dominion/web",
@@ -16,7 +16,7 @@
   "devDependencies": {
     "concurrently": "^9.1.2",
     "typescript": "^5.8.2",
-    "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
   }
 }
