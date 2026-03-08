@@ -17,7 +17,8 @@ function logDiagnostic(message, details) {
 
 const argAliases = {
   iosSimulator: ['--iosSimulator', '--ios-simulator', '--ios'],
-  androidSimulator: ['--androidSimulator', '--android-simulator', '--android']
+  androidSimulator: ['--androidSimulator', '--android-simulator', '--android'],
+  cleanPrebuild: ['--cleanPrebuild', '--clean-prebuild']
 };
 
 function readFlag(name) {
@@ -41,7 +42,11 @@ function readFlag(name) {
 }
 
 function stripControlFlags(args) {
-  const controls = new Set([...argAliases.iosSimulator, ...argAliases.androidSimulator]);
+  const controls = new Set([
+    ...argAliases.iosSimulator,
+    ...argAliases.androidSimulator,
+    ...argAliases.cleanPrebuild
+  ]);
   const filtered = [];
 
   for (let i = 0; i < args.length; i += 1) {
@@ -208,6 +213,7 @@ function runIosBuildWithDiagnostics() {
 
 const iosSimulator = readFlag('iosSimulator');
 const androidSimulator = readFlag('androidSimulator');
+const cleanPrebuild = readFlag('cleanPrebuild');
 
 logDiagnostic('Execution context', {
   cwd: projectRoot,
@@ -215,7 +221,7 @@ logDiagnostic('Execution context', {
   platform: process.platform,
   rawArgs
 });
-logDiagnostic('Resolved platform flags', { iosSimulator, androidSimulator });
+logDiagnostic('Resolved platform flags', { iosSimulator, androidSimulator, cleanPrebuild });
 
 if (iosSimulator && androidSimulator) {
   console.error('❌ Choose only one platform bootstrap flag: --iosSimulator or --androidSimulator');
@@ -238,7 +244,13 @@ if (iosSimulator) {
   console.log('\n🔧 Preparing iOS development client (simulator build + install)...');
   // Run the toolchain check directly so failures are reported once from this command.
   run('node ./scripts/check-ios-toolchain.mjs', 'iOS toolchain check');
-  run('CI=1 npx expo prebuild --platform ios --clean', 'Expo iOS prebuild');
+
+  if (cleanPrebuild) {
+    run('CI=1 npx expo prebuild --platform ios --clean', 'Expo iOS prebuild (clean)');
+  } else {
+    logDiagnostic('Skipping automatic iOS prebuild; pass --cleanPrebuild to regenerate ios/Pods before build');
+  }
+
   runIosBuildWithDiagnostics();
 }
 
