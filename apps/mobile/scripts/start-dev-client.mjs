@@ -174,7 +174,7 @@ function run(command, description, options = {}) {
 }
 
 function runIosBuildWithDiagnostics() {
-  const baseCommand = 'npx expo run:ios --no-bundler';
+  const baseCommand = 'EXPO_DEBUG=1 npx expo run:ios --no-bundler --verbose';
   const baseAttempt = run(baseCommand, 'Expo iOS simulator build/install', { exitOnError: false });
 
   if (baseAttempt.ok) {
@@ -184,8 +184,8 @@ function runIosBuildWithDiagnostics() {
   if (baseAttempt.status === 65) {
     console.error('');
     console.error('🧭 xcodebuild exited with code 65 (generic iOS build failure).');
-    console.error('   Automatically retrying with verbose native logs to surface a root cause...');
-    const verboseCommand = 'npx expo run:ios --no-bundler --verbose';
+    console.error('   Automatically retrying with extra Expo/Xcode diagnostics to surface a root cause...');
+    const verboseCommand = 'EXPO_DEBUG=1 npx expo run:ios --no-bundler --verbose';
     const verboseAttempt = run(verboseCommand, 'Expo iOS simulator build/install (verbose retry)', { exitOnError: false });
 
     if (verboseAttempt.ok) {
