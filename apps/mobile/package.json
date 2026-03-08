@@ -6,8 +6,9 @@
   "scripts": {
     "start": "expo start --dev-client --non-interactive",
     "android": "expo run:android",
-    "ios": "expo run:ios",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "ios": "npm run ios:check && expo run:ios",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "ios:check": "node ./scripts/check-ios-toolchain.mjs"
   },
   "dependencies": {
     "@dominion/shared": "0.0.1",
