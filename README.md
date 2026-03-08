@@ -99,11 +99,11 @@ npm run android -w @dominion/mobile
 npm run ios -w @dominion/mobile
 ```
 
-Before the iOS build starts, the mobile workspace now runs a prerequisite check (`npm run ios:check -w @dominion/mobile`) and a clean iOS prebuild (`npm run ios:prebuild -w @dominion/mobile`) so native Podfile changes from Expo/RN upgrades are regenerated before `pod install` (the script uses `CI=1` to suppress Expo prebuild prompts).
+Before the iOS build starts, the mobile workspace now runs a prerequisite check (`npm run ios:check -w @dominion/mobile`) and a clean iOS prebuild (`npm run ios:prebuild -w @dominion/mobile`) so native Podfile changes from Expo/RN upgrades are regenerated before `pod install` (the script uses `CI=1` to suppress Expo prebuild prompts). The prerequisite check also verifies your installed `react-native` version matches `apps/mobile/package.json` to catch stale `node_modules` after dependency bumps.
 
 ## Mobile troubleshooting
 
-- If `npm run ios:check -w @dominion/mobile` reports missing prerequisites, fix those first and rerun the command.
+- If `npm run ios:check -w @dominion/mobile` reports missing prerequisites or a React Native version mismatch, run `npm install` at repo root and rerun the command.
 - If `npm run dev:mobile` works but `npm run ios -w @dominion/mobile` fails with `Unable to run simctl` / `xcrun simctl ... code: 69`, your Xcode CLI tooling is not usable on that machine.
 - Fix locally by resetting and selecting Xcode command line tools, then launching Xcode once to accept licenses:
 
