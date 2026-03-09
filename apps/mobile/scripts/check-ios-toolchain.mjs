@@ -7,6 +7,7 @@ import { createRequire } from "node:module";
 const projectRoot = path.resolve(process.cwd());
 const requireFromProject = createRequire(path.join(projectRoot, "package.json"));
 const debugEnabled = process.argv.includes("--debug") || process.env.DEBUG_IOS_TOOLCHAIN === "1";
+const fixEnabled = process.argv.includes("--fix") || process.env.FIX_IOS_TOOLCHAIN === "1";
 
 function printDebug(message) {
   if (debugEnabled) {
@@ -21,6 +22,25 @@ function runCheckCommand(command) {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"]
   });
+}
+
+function runFixCommand(command) {
+  printDebug(`Running fix command: ${command}`);
+
+  try {
+    execSync(command, {
+      encoding: "utf8",
+      stdio: "inherit"
+    });
+    console.log(`   ✅ Ran: ${command}`);
+    return true;
+  } catch (error) {
+    console.error(`   ⚠️  Could not run: ${command}`);
+    if (error instanceof Error) {
+      printDebug(error.message);
+    }
+    return false;
+  }
 }
 
 function printCapturedOutput(label, output) {
@@ -46,6 +66,15 @@ const checks = [
       "Install/repair Xcode command line tools:",
       "  xcode-select --install",
       "  sudo xcode-select -s /Applications/Xcode.app/Contents/Developer"
+    ]
+  },
+  {
+    name: "xcodebuild",
+    command: "xcodebuild -version",
+    fix: [
+      "Install full Xcode app and ensure it is selected:",
+      "  sudo xcode-select -s /Applications/Xcode.app/Contents/Developer",
+      "  sudo xcodebuild -runFirstLaunch"
     ]
   },
   {
@@ -82,16 +111,6 @@ const checks = [
       "  2. Open Simulator.app once and verify at least one iPhone device exists.",
       "If Expo reports \"CommandError: No iOS devices available in Simulator.app\",",
       "this is usually the missing runtime/device state above."
-    ]
-  },
-  {
-    name: "CocoaPods CLI",
-    command: "pod --version",
-    fix: [
-      "Install CocoaPods before running expo run:ios:",
-      "  sudo gem install cocoapods --no-document",
-      "or",
-      "  brew install cocoapods"
     ]
   }
 ];
@@ -134,7 +153,14 @@ for (const check of checks) {
     for (const line of check.fix) {
       console.error(`   ${line}`);
     }
+
   }
+}
+
+if (fixEnabled) {
+  console.log("\n🔧 Running dependency sync checks for Expo/iOS...");
+  runFixCommand("npm install");
+  runFixCommand("npx expo install --fix --non-interactive");
 }
 
 try {

@@ -184,6 +184,10 @@ function runIosBuildWithDiagnostics() {
   if (baseAttempt.status === 65) {
     console.error('');
     console.error('🧭 xcodebuild exited with code 65 (generic iOS build failure).');
+    console.error('   Running iOS self-heal (toolchain/dependency validation) before retry...');
+    run('node ./scripts/check-ios-toolchain.mjs --fix', 'iOS toolchain self-heal', { exitOnError: false });
+    run('npx expo run:ios --no-bundler', 'Expo iOS build/install self-heal retry', { exitOnError: false, env: { EXPO_DEBUG: '1' } });
+
     console.error('   Automatically retrying with Expo debug diagnostics to surface a root cause...');
     const verboseCommand = 'npx expo run:ios --no-bundler';
     const verboseAttempt = run(verboseCommand, 'Expo iOS simulator build/install (debug retry)', { exitOnError: false, env: { EXPO_DEBUG: '1' } });
@@ -194,16 +198,14 @@ function runIosBuildWithDiagnostics() {
 
     console.error('');
     console.error('   Suggested follow-up steps:');
-    console.error('   1) Ensure Pods are fresh after dependency updates:');
+    console.error('   1) Refresh Expo iOS native artifacts after dependency updates:');
     console.error('      npm run ios:prebuild -w @dominion/mobile');
-    console.error('      cd apps/mobile/ios && pod install --repo-update');
     console.error('   2) Open ios/*.xcworkspace in Xcode and build once to inspect signing/runtime errors.');
     console.error('   3) If this began after an SDK/RN upgrade, delete apps/mobile/ios and prebuild again.');
     console.error('   4) If you hit `EXReactRootViewFactory.h ... RCTDevMenuConfiguration ... expected a type`,');
-    console.error('      regenerate iOS artifacts and pods from scratch:');
+    console.error('      regenerate iOS artifacts from scratch:');
     console.error('      rm -rf apps/mobile/ios');
     console.error('      npm run ios:prebuild -w @dominion/mobile');
-    console.error('      cd apps/mobile/ios && pod install --repo-update');
 
     process.exit(verboseAttempt.status || 1);
   }
@@ -243,12 +245,12 @@ if (!iosSimulator && !androidSimulator && process.platform === 'darwin' && hasBo
 if (iosSimulator) {
   console.log('\n🔧 Preparing iOS development client (simulator build + install)...');
   // Run the toolchain check directly so failures are reported once from this command.
-  run('node ./scripts/check-ios-toolchain.mjs', 'iOS toolchain check');
+  run('node ./scripts/check-ios-toolchain.mjs --fix', 'iOS toolchain check + self-heal');
 
   if (cleanPrebuild) {
     run('CI=1 npx expo prebuild --platform ios --clean', 'Expo iOS prebuild (clean)');
   } else {
-    logDiagnostic('Skipping automatic iOS prebuild; pass --cleanPrebuild to regenerate ios/Pods before build');
+    logDiagnostic('Skipping automatic iOS prebuild; pass --cleanPrebuild to regenerate iOS native project files before build');
   }
 
   runIosBuildWithDiagnostics();
