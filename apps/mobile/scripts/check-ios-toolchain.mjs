@@ -128,7 +128,7 @@ for (const check of checks) {
     console.log(`✅ ${check.name} detected`);
     printDebug(`Check passed: ${check.name}`);
   } catch (error) {
-    hasFailure = true;
+    let checkFailed = true;
     console.error(`❌ Missing or broken: ${check.name}`);
 
     if (error instanceof Error) {
