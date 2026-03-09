@@ -7,6 +7,7 @@ import { createRequire } from "node:module";
 const projectRoot = path.resolve(process.cwd());
 const requireFromProject = createRequire(path.join(projectRoot, "package.json"));
 const debugEnabled = process.argv.includes("--debug") || process.env.DEBUG_IOS_TOOLCHAIN === "1";
+const fixEnabled = process.argv.includes("--fix") || process.env.FIX_IOS_TOOLCHAIN === "1";
 
 function printDebug(message) {
   if (debugEnabled) {
@@ -21,6 +22,25 @@ function runCheckCommand(command) {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"]
   });
+}
+
+function runFixCommand(command) {
+  printDebug(`Running fix command: ${command}`);
+
+  try {
+    execSync(command, {
+      encoding: "utf8",
+      stdio: "inherit"
+    });
+    console.log(`   ✅ Ran: ${command}`);
+    return true;
+  } catch (error) {
+    console.error(`   ⚠️  Could not run: ${command}`);
+    if (error instanceof Error) {
+      printDebug(error.message);
+    }
+    return false;
+  }
 }
 
 function printCapturedOutput(label, output) {
@@ -46,6 +66,15 @@ const checks = [
       "Install/repair Xcode command line tools:",
       "  xcode-select --install",
       "  sudo xcode-select -s /Applications/Xcode.app/Contents/Developer"
+    ]
+  },
+  {
+    name: "xcodebuild",
+    command: "xcodebuild -version",
+    fix: [
+      "Install full Xcode app and ensure it is selected:",
+      "  sudo xcode-select -s /Applications/Xcode.app/Contents/Developer",
+      "  sudo xcodebuild -runFirstLaunch"
     ]
   },
   {
@@ -92,7 +121,8 @@ const checks = [
       "  sudo gem install cocoapods --no-document",
       "or",
       "  brew install cocoapods"
-    ]
+    ],
+    autoFixCommands: ["brew install cocoapods"]
   }
 ];
 
@@ -109,7 +139,7 @@ for (const check of checks) {
     console.log(`✅ ${check.name} detected`);
     printDebug(`Check passed: ${check.name}`);
   } catch (error) {
-    hasFailure = true;
+    let checkFailed = true;
     console.error(`❌ Missing or broken: ${check.name}`);
 
     if (error instanceof Error) {
@@ -134,6 +164,42 @@ for (const check of checks) {
     for (const line of check.fix) {
       console.error(`   ${line}`);
     }
+
+    if (fixEnabled && Array.isArray(check.autoFixCommands) && check.autoFixCommands.length > 0) {
+      console.error("   Attempting automatic repair...");
+      let anyFixRan = false;
+      for (const fixCommand of check.autoFixCommands) {
+        anyFixRan = runFixCommand(fixCommand) || anyFixRan;
+      }
+
+      if (anyFixRan) {
+        try {
+          const repairOutput = runCheckCommand(check.command);
+          if (typeof check.validate === "function" && !check.validate(repairOutput)) {
+            throw new Error(`Validation failed for command output from: ${check.command}`);
+          }
+
+          checkFailed = false;
+          console.log(`✅ ${check.name} repaired`);
+        } catch {
+          checkFailed = true;
+        }
+      }
+    }
+
+    if (checkFailed) {
+      hasFailure = true;
+    }
+  }
+}
+
+if (fixEnabled) {
+  console.log("\n🔧 Running dependency sync checks for Expo/iOS...");
+  runFixCommand("npm install");
+  runFixCommand("npx expo install --fix --non-interactive");
+
+  if (existsSync(path.join(projectRoot, "ios"))) {
+    runFixCommand("npx pod-install ios");
   }
 }
 

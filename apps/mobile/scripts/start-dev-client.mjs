@@ -184,6 +184,12 @@ function runIosBuildWithDiagnostics() {
   if (baseAttempt.status === 65) {
     console.error('');
     console.error('🧭 xcodebuild exited with code 65 (generic iOS build failure).');
+    console.error('   Running iOS self-heal (toolchain/dependency validation) before retry...');
+    run('node ./scripts/check-ios-toolchain.mjs --fix', 'iOS toolchain self-heal', { exitOnError: false });
+    if (existsSync(path.join(projectRoot, 'ios'))) {
+      run('cd ios && pod install --repo-update', 'CocoaPods install/update', { exitOnError: false });
+    }
+
     console.error('   Automatically retrying with Expo debug diagnostics to surface a root cause...');
     const verboseCommand = 'npx expo run:ios --no-bundler';
     const verboseAttempt = run(verboseCommand, 'Expo iOS simulator build/install (debug retry)', { exitOnError: false, env: { EXPO_DEBUG: '1' } });
@@ -243,7 +249,7 @@ if (!iosSimulator && !androidSimulator && process.platform === 'darwin' && hasBo
 if (iosSimulator) {
   console.log('\n🔧 Preparing iOS development client (simulator build + install)...');
   // Run the toolchain check directly so failures are reported once from this command.
-  run('node ./scripts/check-ios-toolchain.mjs', 'iOS toolchain check');
+  run('node ./scripts/check-ios-toolchain.mjs --fix', 'iOS toolchain check + self-heal');
 
   if (cleanPrebuild) {
     run('CI=1 npx expo prebuild --platform ios --clean', 'Expo iOS prebuild (clean)');
