@@ -16,8 +16,8 @@ function logDiagnostic(message, details) {
 }
 
 const argAliases = {
-  iosSimulator: ['--iosSimulator', '--ios-simulator', '--ios'],
-  androidSimulator: ['--androidSimulator', '--android-simulator', '--android'],
+  iosSimulator: ['--iosSimulator', '--ios-simulator'],
+  androidSimulator: ['--androidSimulator', '--android-simulator'],
   cleanPrebuild: ['--cleanPrebuild', '--clean-prebuild']
 };
 
@@ -63,6 +63,17 @@ function stripControlFlags(args) {
   }
 
   return filtered;
+}
+
+function hasExpoHostArg(args) {
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg === '--host' || arg.startsWith('--host=')) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function readExpoScheme() {
@@ -129,6 +140,78 @@ function isInstalledOnBootedSimulator(bundleIdentifiers) {
     return bundleIdentifiers.some((bundleId) => installedBundleIds.has(bundleId));
   } catch (error) {
     logDiagnostic('Failed to inspect installed iOS simulator apps', error instanceof Error ? error.message : String(error));
+    return false;
+  }
+}
+
+
+function resolveIosSimulatorUdid() {
+  try {
+    const output = execSync('xcrun simctl list devices --json', {
+      cwd: projectRoot,
+      stdio: ['ignore', 'pipe', 'pipe']
+    }).toString();
+    const parsed = JSON.parse(output);
+    const devices = Object.values(parsed.devices ?? {}).flat();
+    const iosDevices = devices.filter((device) => {
+      const runtime = String(device.runtime ?? '');
+      const isIosRuntime = runtime.includes('iOS') || runtime.includes('com.apple.CoreSimulator.SimRuntime.iOS');
+      return device.isAvailable !== false && isIosRuntime;
+    });
+
+    const booted = iosDevices.find((device) => device.state === 'Booted');
+    if (booted?.udid) {
+      return booted.udid;
+    }
+
+    const firstAvailable = iosDevices.find((device) => typeof device.udid === 'string');
+    return firstAvailable?.udid ?? null;
+  } catch (error) {
+    logDiagnostic('Failed to resolve iOS simulator device list', error instanceof Error ? error.message : String(error));
+    return null;
+  }
+}
+
+function ensureBootedSimulator(udid) {
+  if (!udid) {
+    return false;
+  }
+
+  try {
+    execSync(`xcrun simctl boot ${udid}`, {
+      cwd: projectRoot,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    logDiagnostic('Booted iOS simulator', udid);
+    return true;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('Unable to boot device in current state: Booted')) {
+      logDiagnostic('iOS simulator already booted', udid);
+      return true;
+    }
+
+    logDiagnostic('Failed to boot iOS simulator', message);
+    return false;
+  }
+}
+
+function isInstalledOnSimulator(udid, bundleIdentifiers) {
+  if (!udid || bundleIdentifiers.length === 0) {
+    return true;
+  }
+
+  try {
+    const output = execSync(`xcrun simctl listapps ${udid} --json`, {
+      cwd: projectRoot,
+      stdio: ['ignore', 'pipe', 'pipe']
+    }).toString();
+    const parsed = JSON.parse(output);
+    const installedBundleIds = new Set(Object.keys(parsed?.apps ?? {}));
+    logDiagnostic('Installed app bundle identifiers on target iOS simulator', [...installedBundleIds]);
+    return bundleIdentifiers.some((bundleId) => installedBundleIds.has(bundleId));
+  } catch (error) {
+    logDiagnostic('Failed to inspect installed apps on target iOS simulator', error instanceof Error ? error.message : String(error));
     return false;
   }
 }
@@ -217,6 +300,10 @@ const iosSimulator = readFlag('iosSimulator');
 const androidSimulator = readFlag('androidSimulator');
 const cleanPrebuild = readFlag('cleanPrebuild');
 
+if (rawArgs.includes('--ios') || rawArgs.includes('--android')) {
+  logDiagnostic('Detected Expo platform arg (--ios/--android). These now only control expo start and no longer trigger simulator build bootstrap; use --iosSimulator or --androidSimulator for build/install.');
+}
+
 logDiagnostic('Execution context', {
   cwd: projectRoot,
   node: process.version,
@@ -253,7 +340,16 @@ if (iosSimulator) {
     logDiagnostic('Skipping automatic iOS prebuild; pass --cleanPrebuild to regenerate iOS native project files before build');
   }
 
-  runIosBuildWithDiagnostics();
+  const targetSimulatorUdid = resolveIosSimulatorUdid();
+  const hasTargetSimulator = ensureBootedSimulator(targetSimulatorUdid);
+  const isInstalledOnTarget = hasTargetSimulator && isInstalledOnSimulator(targetSimulatorUdid, bundleIdentifiers);
+
+  if (!isInstalledOnTarget) {
+    logDiagnostic('No installed iOS development build detected on target simulator; running Expo iOS build/install bootstrap');
+    runIosBuildWithDiagnostics();
+  } else {
+    logDiagnostic('Detected installed iOS development build on target simulator; skipping Expo run:ios bootstrap to continue directly to Expo Metro start');
+  }
 }
 
 if (androidSimulator) {
@@ -262,6 +358,11 @@ if (androidSimulator) {
 }
 
 const passthroughArgs = stripControlFlags(rawArgs);
+
+const hasExplicitHostArg = hasExpoHostArg(passthroughArgs);
+if (iosSimulator && !hasExplicitHostArg) {
+  logDiagnostic('Defaulting Expo host to localhost for iOS simulator (override with --host lan or --host tunnel)');
+}
 
 if (iosSimulator && !passthroughArgs.includes('--ios')) {
   passthroughArgs.push('--ios');
@@ -276,12 +377,19 @@ if (scheme && (iosSimulator || androidSimulator) && !passthroughArgs.includes('-
   passthroughArgs.push('--scheme', scheme);
 }
 
+const defaultHost = hasExplicitHostArg ? null : (iosSimulator ? 'localhost' : 'lan');
 const expoArgs = passthroughArgs.join(' ');
-const startCommand = expoArgs.length > 0
-  ? `npx expo start --dev-client --host lan ${expoArgs}`
-  : 'npx expo start --dev-client --host lan';
+const startCommandParts = ['npx expo start --dev-client'];
+if (defaultHost) {
+  startCommandParts.push(`--host ${defaultHost}`);
+}
+if (expoArgs.length > 0) {
+  startCommandParts.push(expoArgs);
+}
+const startCommand = startCommandParts.join(' ');
 
 logDiagnostic('Final Expo CLI arguments', passthroughArgs);
+logDiagnostic('Resolved Expo host', defaultHost ?? 'explicit flag provided by caller');
 
 console.log('\n🚀 Launching Expo Metro in dev-client mode...');
 run(startCommand, 'Expo Metro dev-client start');
