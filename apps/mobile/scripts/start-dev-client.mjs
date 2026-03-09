@@ -268,7 +268,13 @@ if (iosSimulator) {
     logDiagnostic('Skipping automatic iOS prebuild; pass --cleanPrebuild to regenerate iOS native project files before build');
   }
 
-  runIosBuildWithDiagnostics();
+  const shouldBootstrapInstall = !hasBootedIosSimulator() || !isInstalledOnBootedSimulator(bundleIdentifiers);
+  if (shouldBootstrapInstall) {
+    logDiagnostic('No installed iOS development build detected on a booted simulator; running Expo iOS build/install bootstrap');
+    runIosBuildWithDiagnostics();
+  } else {
+    logDiagnostic('Detected installed iOS development build on booted simulator; skipping Expo run:ios bootstrap to continue directly to Expo Metro start');
+  }
 }
 
 if (androidSimulator) {
