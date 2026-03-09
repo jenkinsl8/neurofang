@@ -289,13 +289,10 @@ if (iosSimulator && !hasExplicitHostArg) {
   logDiagnostic('Defaulting Expo host to localhost for iOS simulator (override with --host lan or --host tunnel)');
 }
 
-if (iosSimulator && !passthroughArgs.includes('--ios')) {
-  passthroughArgs.push('--ios');
-}
-
-if (androidSimulator && !passthroughArgs.includes('--android')) {
-  passthroughArgs.push('--android');
-}
+// Intentionally do not auto-append --ios/--android to `expo start`.
+// Those flags trigger a one-shot "open on device" flow that can cause the
+// process to exit after launch in some environments. We bootstrap install via
+// `expo run:<platform> --no-bundler` above, then keep Metro alive here.
 
 const scheme = readExpoScheme();
 if (scheme && (iosSimulator || androidSimulator) && !passthroughArgs.includes('--scheme')) {
