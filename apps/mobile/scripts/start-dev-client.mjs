@@ -16,8 +16,8 @@ function logDiagnostic(message, details) {
 }
 
 const argAliases = {
-  iosSimulator: ['--iosSimulator', '--ios-simulator', '--ios'],
-  androidSimulator: ['--androidSimulator', '--android-simulator', '--android'],
+  iosSimulator: ['--iosSimulator', '--ios-simulator'],
+  androidSimulator: ['--androidSimulator', '--android-simulator'],
   cleanPrebuild: ['--cleanPrebuild', '--clean-prebuild']
 };
 
@@ -227,6 +227,10 @@ function runIosBuildWithDiagnostics() {
 const iosSimulator = readFlag('iosSimulator');
 const androidSimulator = readFlag('androidSimulator');
 const cleanPrebuild = readFlag('cleanPrebuild');
+
+if (rawArgs.includes('--ios') || rawArgs.includes('--android')) {
+  logDiagnostic('Detected Expo platform arg (--ios/--android). These now only control expo start and no longer trigger simulator build bootstrap; use --iosSimulator or --androidSimulator for build/install.');
+}
 
 logDiagnostic('Execution context', {
   cwd: projectRoot,
