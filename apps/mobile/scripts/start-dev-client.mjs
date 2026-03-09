@@ -16,8 +16,8 @@ function logDiagnostic(message, details) {
 }
 
 const argAliases = {
-  iosSimulator: ['--iosSimulator', '--ios-simulator', '--ios'],
-  androidSimulator: ['--androidSimulator', '--android-simulator', '--android'],
+  iosSimulator: ['--iosSimulator', '--ios-simulator'],
+  androidSimulator: ['--androidSimulator', '--android-simulator'],
   cleanPrebuild: ['--cleanPrebuild', '--clean-prebuild']
 };
 
@@ -63,6 +63,17 @@ function stripControlFlags(args) {
   }
 
   return filtered;
+}
+
+function hasExpoHostArg(args) {
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg === '--host' || arg.startsWith('--host=')) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function readExpoScheme() {
@@ -217,6 +228,10 @@ const iosSimulator = readFlag('iosSimulator');
 const androidSimulator = readFlag('androidSimulator');
 const cleanPrebuild = readFlag('cleanPrebuild');
 
+if (rawArgs.includes('--ios') || rawArgs.includes('--android')) {
+  logDiagnostic('Detected Expo platform arg (--ios/--android). These now only control expo start and no longer trigger simulator build bootstrap; use --iosSimulator or --androidSimulator for build/install.');
+}
+
 logDiagnostic('Execution context', {
   cwd: projectRoot,
   node: process.version,
@@ -263,6 +278,11 @@ if (androidSimulator) {
 
 const passthroughArgs = stripControlFlags(rawArgs);
 
+const hasExplicitHostArg = hasExpoHostArg(passthroughArgs);
+if (iosSimulator && !hasExplicitHostArg) {
+  logDiagnostic('Defaulting Expo host to localhost for iOS simulator (override with --host lan or --host tunnel)');
+}
+
 if (iosSimulator && !passthroughArgs.includes('--ios')) {
   passthroughArgs.push('--ios');
 }
@@ -276,12 +296,19 @@ if (scheme && (iosSimulator || androidSimulator) && !passthroughArgs.includes('-
   passthroughArgs.push('--scheme', scheme);
 }
 
+const defaultHost = hasExplicitHostArg ? null : (iosSimulator ? 'localhost' : 'lan');
 const expoArgs = passthroughArgs.join(' ');
-const startCommand = expoArgs.length > 0
-  ? `npx expo start --dev-client --host lan ${expoArgs}`
-  : 'npx expo start --dev-client --host lan';
+const startCommandParts = ['npx expo start --dev-client'];
+if (defaultHost) {
+  startCommandParts.push(`--host ${defaultHost}`);
+}
+if (expoArgs.length > 0) {
+  startCommandParts.push(expoArgs);
+}
+const startCommand = startCommandParts.join(' ');
 
 logDiagnostic('Final Expo CLI arguments', passthroughArgs);
+logDiagnostic('Resolved Expo host', defaultHost ?? 'explicit flag provided by caller');
 
 console.log('\n🚀 Launching Expo Metro in dev-client mode...');
 run(startCommand, 'Expo Metro dev-client start');
