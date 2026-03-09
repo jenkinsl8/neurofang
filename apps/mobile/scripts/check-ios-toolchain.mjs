@@ -112,17 +112,6 @@ const checks = [
       "If Expo reports \"CommandError: No iOS devices available in Simulator.app\",",
       "this is usually the missing runtime/device state above."
     ]
-  },
-  {
-    name: "CocoaPods CLI",
-    command: "pod --version",
-    fix: [
-      "Install CocoaPods before running expo run:ios:",
-      "  sudo gem install cocoapods --no-document",
-      "or",
-      "  brew install cocoapods"
-    ],
-    autoFixCommands: ["brew install cocoapods"]
   }
 ];
 
@@ -165,31 +154,6 @@ for (const check of checks) {
       console.error(`   ${line}`);
     }
 
-    if (fixEnabled && Array.isArray(check.autoFixCommands) && check.autoFixCommands.length > 0) {
-      console.error("   Attempting automatic repair...");
-      let anyFixRan = false;
-      for (const fixCommand of check.autoFixCommands) {
-        anyFixRan = runFixCommand(fixCommand) || anyFixRan;
-      }
-
-      if (anyFixRan) {
-        try {
-          const repairOutput = runCheckCommand(check.command);
-          if (typeof check.validate === "function" && !check.validate(repairOutput)) {
-            throw new Error(`Validation failed for command output from: ${check.command}`);
-          }
-
-          checkFailed = false;
-          console.log(`✅ ${check.name} repaired`);
-        } catch {
-          checkFailed = true;
-        }
-      }
-    }
-
-    if (checkFailed) {
-      hasFailure = true;
-    }
   }
 }
 
@@ -197,10 +161,6 @@ if (fixEnabled) {
   console.log("\n🔧 Running dependency sync checks for Expo/iOS...");
   runFixCommand("npm install");
   runFixCommand("npx expo install --fix --non-interactive");
-
-  if (existsSync(path.join(projectRoot, "ios"))) {
-    runFixCommand("npx pod-install ios");
-  }
 }
 
 try {
