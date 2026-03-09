@@ -144,6 +144,78 @@ function isInstalledOnBootedSimulator(bundleIdentifiers) {
   }
 }
 
+
+function resolveIosSimulatorUdid() {
+  try {
+    const output = execSync('xcrun simctl list devices --json', {
+      cwd: projectRoot,
+      stdio: ['ignore', 'pipe', 'pipe']
+    }).toString();
+    const parsed = JSON.parse(output);
+    const devices = Object.values(parsed.devices ?? {}).flat();
+    const iosDevices = devices.filter((device) => {
+      const runtime = String(device.runtime ?? '');
+      const isIosRuntime = runtime.includes('iOS') || runtime.includes('com.apple.CoreSimulator.SimRuntime.iOS');
+      return device.isAvailable !== false && isIosRuntime;
+    });
+
+    const booted = iosDevices.find((device) => device.state === 'Booted');
+    if (booted?.udid) {
+      return booted.udid;
+    }
+
+    const firstAvailable = iosDevices.find((device) => typeof device.udid === 'string');
+    return firstAvailable?.udid ?? null;
+  } catch (error) {
+    logDiagnostic('Failed to resolve iOS simulator device list', error instanceof Error ? error.message : String(error));
+    return null;
+  }
+}
+
+function ensureBootedSimulator(udid) {
+  if (!udid) {
+    return false;
+  }
+
+  try {
+    execSync(`xcrun simctl boot ${udid}`, {
+      cwd: projectRoot,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    logDiagnostic('Booted iOS simulator', udid);
+    return true;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('Unable to boot device in current state: Booted')) {
+      logDiagnostic('iOS simulator already booted', udid);
+      return true;
+    }
+
+    logDiagnostic('Failed to boot iOS simulator', message);
+    return false;
+  }
+}
+
+function isInstalledOnSimulator(udid, bundleIdentifiers) {
+  if (!udid || bundleIdentifiers.length === 0) {
+    return true;
+  }
+
+  try {
+    const output = execSync(`xcrun simctl listapps ${udid} --json`, {
+      cwd: projectRoot,
+      stdio: ['ignore', 'pipe', 'pipe']
+    }).toString();
+    const parsed = JSON.parse(output);
+    const installedBundleIds = new Set(Object.keys(parsed?.apps ?? {}));
+    logDiagnostic('Installed app bundle identifiers on target iOS simulator', [...installedBundleIds]);
+    return bundleIdentifiers.some((bundleId) => installedBundleIds.has(bundleId));
+  } catch (error) {
+    logDiagnostic('Failed to inspect installed apps on target iOS simulator', error instanceof Error ? error.message : String(error));
+    return false;
+  }
+}
+
 function printRunFailure(error, command, description) {
   const status = error && typeof error === 'object' && 'status' in error
     ? Number(error.status) || 1
@@ -268,12 +340,15 @@ if (iosSimulator) {
     logDiagnostic('Skipping automatic iOS prebuild; pass --cleanPrebuild to regenerate iOS native project files before build');
   }
 
-  const shouldBootstrapInstall = !hasBootedIosSimulator() || !isInstalledOnBootedSimulator(bundleIdentifiers);
-  if (shouldBootstrapInstall) {
-    logDiagnostic('No installed iOS development build detected on a booted simulator; running Expo iOS build/install bootstrap');
+  const targetSimulatorUdid = resolveIosSimulatorUdid();
+  const hasTargetSimulator = ensureBootedSimulator(targetSimulatorUdid);
+  const isInstalledOnTarget = hasTargetSimulator && isInstalledOnSimulator(targetSimulatorUdid, bundleIdentifiers);
+
+  if (!isInstalledOnTarget) {
+    logDiagnostic('No installed iOS development build detected on target simulator; running Expo iOS build/install bootstrap');
     runIosBuildWithDiagnostics();
   } else {
-    logDiagnostic('Detected installed iOS development build on booted simulator; skipping Expo run:ios bootstrap to continue directly to Expo Metro start');
+    logDiagnostic('Detected installed iOS development build on target simulator; skipping Expo run:ios bootstrap to continue directly to Expo Metro start');
   }
 }
 
