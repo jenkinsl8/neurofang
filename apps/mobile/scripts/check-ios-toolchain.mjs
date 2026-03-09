@@ -160,7 +160,7 @@ for (const check of checks) {
 if (fixEnabled) {
   console.log("\n🔧 Running dependency sync checks for Expo/iOS...");
   runFixCommand("npm install");
-  runFixCommand("npx expo install --fix --non-interactive");
+  runFixCommand("npx expo install --fix -- --non-interactive");
 }
 
 try {
