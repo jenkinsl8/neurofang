@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, SafeAreaView, Text, View } from 'react-native';
+import { Button, Text, View } from 'react-native';
 import Constants from 'expo-constants';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import type { AvatarCatalogEntry, InterviewIntake } from '@dominion/shared';
 
 const defaultRealtimeIceServers: RTCIceServer[] = [
