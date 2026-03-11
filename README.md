@@ -61,8 +61,10 @@ npm run deploy:check
 - `npm run dev:mobile` launches Expo in **dev-client** mode (not Expo Go).
 - Build/install the simulator app once with:
   - `npm run dev:mobile -- --iosSimulator`
+  - Use `npm run dev:mobile -- --iosSimulator --desktopOnly` to install the app onto the simulator home screen without auto-launching it.
 - After the app is installed on a booted simulator, repeated `--iosSimulator` runs skip `expo run:ios` bootstrap and go straight to `expo start --dev-client` so Metro always starts promptly.
 - For iOS simulator, this repo now defaults Expo host to `localhost` unless you explicitly pass `--host`.
+- iOS simulator deep links are forced to `127.0.0.1` by default for dev-server reliability; pass an explicit `--host` to override.
 - If you open the app manually via deep link, use an `exp+` URL that matches the app scheme in `apps/mobile/app.json` (`dominionmobile`), for example:
   - `exp+dominionmobile://expo-development-client/?url=exp%3A%2F%2Flocalhost%3A8081`
 
