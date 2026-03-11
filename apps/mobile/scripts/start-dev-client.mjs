@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
 const projectRoot = path.resolve(process.cwd());
@@ -298,21 +298,22 @@ function runIosBuildWithDiagnostics() {
   process.exit(baseAttempt.status || 1);
 }
 
-function listFirstMatchingPath(globPath) {
-  try {
-    const output = execSync(`ls -1 ${globPath}`, {
-      cwd: projectRoot,
-      stdio: ['ignore', 'pipe', 'pipe']
-    })
-      .toString()
-      .trim()
-      .split('\n')
-      .filter(Boolean);
-
-    return output[0] ?? null;
-  } catch {
+function findFirstDirectoryWithSuffix(directoryPath, suffix) {
+  if (!existsSync(directoryPath)) {
     return null;
   }
+
+  const entries = readdirSync(directoryPath, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name.endsWith(suffix))
+    .map((entry) => entry.name)
+    .sort((a, b) => a.localeCompare(b));
+
+  const firstEntry = entries[0];
+  if (!firstEntry) {
+    return null;
+  }
+
+  return path.join(directoryPath, firstEntry);
 }
 
 function buildAndInstallIosAppDesktopOnly(udid) {
@@ -323,7 +324,7 @@ function buildAndInstallIosAppDesktopOnly(udid) {
     return false;
   }
 
-  const workspacePath = listFirstMatchingPath('ios/*.xcworkspace');
+  const workspacePath = findFirstDirectoryWithSuffix('ios', '.xcworkspace');
   if (!workspacePath) {
     console.error('❌ Desktop-only install requested but no iOS workspace (*.xcworkspace) was found.');
     console.error('   Run: npm run ios:prebuild -w @dominion/mobile');
@@ -337,18 +338,18 @@ function buildAndInstallIosAppDesktopOnly(udid) {
   run(
     [
       'xcodebuild',
-      `-workspace ${workspacePath}`,
+      `-workspace "${workspacePath}"`,
       `-scheme ${scheme}`,
       '-configuration Debug',
       '-sdk iphonesimulator',
       `-destination "${destination}"`,
-      `-derivedDataPath ${derivedDataPath}`,
+      `-derivedDataPath "${derivedDataPath}"`,
       'build'
     ].join(' '),
     'iOS simulator build (desktop-only install)'
   );
 
-  const appPath = listFirstMatchingPath('ios/build/Build/Products/Debug-iphonesimulator/*.app');
+  const appPath = findFirstDirectoryWithSuffix('ios/build/Build/Products/Debug-iphonesimulator', '.app');
   if (!appPath) {
     console.error('❌ Unable to locate built .app artifact for iOS desktop-only install flow.');
     process.exit(1);
@@ -359,7 +360,7 @@ function buildAndInstallIosAppDesktopOnly(udid) {
     return false;
   }
 
-  run(`xcrun simctl install ${udid} ${appPath}`, 'iOS simulator app install (desktop-only)');
+  run(`xcrun simctl install ${udid} "${appPath}"`, 'iOS simulator app install (desktop-only)');
   logDiagnostic('Installed iOS development client on simulator without auto-launch', { udid, appPath });
   return true;
 }
