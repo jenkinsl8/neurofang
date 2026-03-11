@@ -78,6 +78,21 @@ function hasExpoHostArg(args) {
   return false;
 }
 
+function readExpoHostArg(args) {
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg === '--host') {
+      return args[i + 1] ?? null;
+    }
+
+    if (arg.startsWith('--host=')) {
+      return arg.slice('--host='.length);
+    }
+  }
+
+  return null;
+}
+
 function readExpoScheme() {
   const appJsonPath = path.join(projectRoot, 'app.json');
 
@@ -460,6 +475,12 @@ const startCommand = startCommandParts.join(' ');
 
 logDiagnostic('Final Expo CLI arguments', passthroughArgs);
 logDiagnostic('Resolved Expo host', defaultHost ?? 'explicit flag provided by caller');
+
+const explicitHost = readExpoHostArg(passthroughArgs);
+const resolvedHost = explicitHost ?? defaultHost;
+if (iosSimulator && resolvedHost === 'lan') {
+  console.warn('\n⚠️  [start:dev-client] iOS simulator is using --host lan. Ensure your Mac hosting Metro/server is on Wi‑Fi and reachable on the same LAN subnet.');
+}
 
 console.log('\n🚀 Launching Expo Metro in dev-client mode...');
 

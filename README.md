@@ -65,6 +65,7 @@ npm run deploy:check
 - After the app is installed on a booted simulator, repeated `--iosSimulator` runs skip `expo run:ios` bootstrap and go straight to `expo start --dev-client` so Metro always starts promptly.
 - For iOS simulator, this repo now defaults Expo host to `localhost` unless you explicitly pass `--host`.
 - iOS simulator deep links are forced to `127.0.0.1` by default for dev-server reliability; pass an explicit `--host` to override.
+- If you explicitly use `--host lan` on iOS simulator, ensure your Mac host has Wi‑Fi/network connectivity and that Metro/backend are reachable on the same LAN.
 - If you open the app manually via deep link, use an `exp+` URL that matches the app scheme in `apps/mobile/app.json` (`dominionmobile`), for example:
   - `exp+dominionmobile://expo-development-client/?url=exp%3A%2F%2Flocalhost%3A8081`
 
