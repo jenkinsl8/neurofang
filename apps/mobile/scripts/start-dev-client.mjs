@@ -154,14 +154,13 @@ function resolveIosSimulatorUdid() {
       stdio: ['ignore', 'pipe', 'pipe']
     }).toString();
     const parsed = JSON.parse(output);
-    const devices = Object.values(parsed.devices ?? {}).flat();
-    const iosDevices = devices.filter((device) => {
-      const runtime = String(device.runtime ?? '');
-      const isIosRuntime = runtime.includes('iOS') || runtime.includes('com.apple.CoreSimulator.SimRuntime.iOS');
-      return device.isAvailable !== false && isIosRuntime;
-    });
 
-    const booted = iosDevices.find((device) => device.state === 'Booted');
+    const iosDevices = Object.entries(parsed.devices ?? {})
+      .filter(([runtime]) => runtime.includes('iOS') || runtime.includes('com.apple.CoreSimulator.SimRuntime.iOS'))
+      .flatMap(([, devices]) => (Array.isArray(devices) ? devices : []))
+      .filter((device) => device.isAvailable !== false);
+
+    const booted = iosDevices.find((device) => device.state === 'Booted' && typeof device.udid === 'string');
     if (booted?.udid) {
       return booted.udid;
     }
@@ -355,13 +354,9 @@ function buildAndInstallIosAppDesktopOnly(udid) {
     process.exit(1);
   }
 
-  if (!udid) {
-    console.error('❌ Desktop-only install requested but no bootable iOS simulator UDID was resolved.');
-    return false;
-  }
-
-  run(`xcrun simctl install ${udid} "${appPath}"`, 'iOS simulator app install (desktop-only)');
-  logDiagnostic('Installed iOS development client on simulator without auto-launch', { udid, appPath });
+  const installTarget = udid ?? 'booted';
+  run(`xcrun simctl install ${installTarget} "${appPath}"`, 'iOS simulator app install (desktop-only)');
+  logDiagnostic('Installed iOS development client on simulator without auto-launch', { installTarget, appPath });
   return true;
 }
 
