@@ -18,7 +18,8 @@ function logDiagnostic(message, details) {
 const argAliases = {
   iosSimulator: ['--iosSimulator', '--ios-simulator'],
   androidSimulator: ['--androidSimulator', '--android-simulator'],
-  cleanPrebuild: ['--cleanPrebuild', '--clean-prebuild']
+  cleanPrebuild: ['--cleanPrebuild', '--clean-prebuild'],
+  desktopOnly: ['--desktopOnly', '--desktop-only']
 };
 
 function readFlag(name) {
@@ -45,7 +46,8 @@ function stripControlFlags(args) {
   const controls = new Set([
     ...argAliases.iosSimulator,
     ...argAliases.androidSimulator,
-    ...argAliases.cleanPrebuild
+    ...argAliases.cleanPrebuild,
+    ...argAliases.desktopOnly
   ]);
   const filtered = [];
 
@@ -296,9 +298,76 @@ function runIosBuildWithDiagnostics() {
   process.exit(baseAttempt.status || 1);
 }
 
+function listFirstMatchingPath(globPath) {
+  try {
+    const output = execSync(`ls -1 ${globPath}`, {
+      cwd: projectRoot,
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+      .toString()
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+
+    return output[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function buildAndInstallIosAppDesktopOnly(udid) {
+  const iosDir = path.join(projectRoot, 'ios');
+  if (!existsSync(iosDir)) {
+    console.error('❌ Desktop-only install requested but iOS native project was not found at apps/mobile/ios.');
+    console.error('   Run: npm run ios:prebuild -w @dominion/mobile');
+    return false;
+  }
+
+  const workspacePath = listFirstMatchingPath('ios/*.xcworkspace');
+  if (!workspacePath) {
+    console.error('❌ Desktop-only install requested but no iOS workspace (*.xcworkspace) was found.');
+    console.error('   Run: npm run ios:prebuild -w @dominion/mobile');
+    return false;
+  }
+
+  const scheme = path.basename(workspacePath, '.xcworkspace');
+  const derivedDataPath = path.join('ios', 'build');
+  const destination = udid ? `id=${udid}` : 'platform=iOS Simulator,name=iPhone 17';
+
+  run(
+    [
+      'xcodebuild',
+      `-workspace ${workspacePath}`,
+      `-scheme ${scheme}`,
+      '-configuration Debug',
+      '-sdk iphonesimulator',
+      `-destination "${destination}"`,
+      `-derivedDataPath ${derivedDataPath}`,
+      'build'
+    ].join(' '),
+    'iOS simulator build (desktop-only install)'
+  );
+
+  const appPath = listFirstMatchingPath('ios/build/Build/Products/Debug-iphonesimulator/*.app');
+  if (!appPath) {
+    console.error('❌ Unable to locate built .app artifact for iOS desktop-only install flow.');
+    process.exit(1);
+  }
+
+  if (!udid) {
+    console.error('❌ Desktop-only install requested but no bootable iOS simulator UDID was resolved.');
+    return false;
+  }
+
+  run(`xcrun simctl install ${udid} ${appPath}`, 'iOS simulator app install (desktop-only)');
+  logDiagnostic('Installed iOS development client on simulator without auto-launch', { udid, appPath });
+  return true;
+}
+
 const iosSimulator = readFlag('iosSimulator');
 const androidSimulator = readFlag('androidSimulator');
 const cleanPrebuild = readFlag('cleanPrebuild');
+const desktopOnly = readFlag('desktopOnly');
 
 if (rawArgs.includes('--ios') || rawArgs.includes('--android')) {
   logDiagnostic('Detected Expo platform arg (--ios/--android). These now only control expo start and no longer trigger simulator build bootstrap; use --iosSimulator or --androidSimulator for build/install.');
@@ -310,7 +379,7 @@ logDiagnostic('Execution context', {
   platform: process.platform,
   rawArgs
 });
-logDiagnostic('Resolved platform flags', { iosSimulator, androidSimulator, cleanPrebuild });
+logDiagnostic('Resolved platform flags', { iosSimulator, androidSimulator, cleanPrebuild, desktopOnly });
 
 if (iosSimulator && androidSimulator) {
   console.error('❌ Choose only one platform bootstrap flag: --iosSimulator or --androidSimulator');
@@ -345,8 +414,16 @@ if (iosSimulator) {
   const isInstalledOnTarget = hasTargetSimulator && isInstalledOnSimulator(targetSimulatorUdid, bundleIdentifiers);
 
   if (!isInstalledOnTarget) {
-    logDiagnostic('No installed iOS development build detected on target simulator; running Expo iOS build/install bootstrap');
-    runIosBuildWithDiagnostics();
+    if (desktopOnly) {
+      logDiagnostic('No installed iOS development build detected on target simulator; using desktop-only install flow');
+      const installed = buildAndInstallIosAppDesktopOnly(targetSimulatorUdid);
+      if (!installed) {
+        process.exit(1);
+      }
+    } else {
+      logDiagnostic('No installed iOS development build detected on target simulator; running Expo iOS build/install bootstrap');
+      runIosBuildWithDiagnostics();
+    }
   } else {
     logDiagnostic('Detected installed iOS development build on target simulator; skipping Expo run:ios bootstrap to continue directly to Expo Metro start');
   }
@@ -389,4 +466,11 @@ logDiagnostic('Final Expo CLI arguments', passthroughArgs);
 logDiagnostic('Resolved Expo host', defaultHost ?? 'explicit flag provided by caller');
 
 console.log('\n🚀 Launching Expo Metro in dev-client mode...');
-run(startCommand, 'Expo Metro dev-client start');
+
+const startEnv = {};
+if (iosSimulator && !hasExplicitHostArg) {
+  // Force localhost in generated deep links for simulator reliability.
+  startEnv.REACT_NATIVE_PACKAGER_HOSTNAME = '127.0.0.1';
+}
+
+run(startCommand, 'Expo Metro dev-client start', { env: startEnv });
