@@ -1,7 +1,6 @@
 import { registerRootComponent } from 'expo';
 import Constants from 'expo-constants';
-import { Text } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, Text } from 'react-native';
 import { createElement } from 'react';
 
 const IS_EXPO_GO = Constants.appOwnership === 'expo';
