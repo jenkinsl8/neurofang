@@ -127,6 +127,11 @@ const checks = [
     packageName: "expo-dev-client",
     expectedVersion: mobilePackage.dependencies?.["expo-dev-client"],
     retryHint: "npm run start:dev-client -w @dominion/mobile"
+  },
+  {
+    packageName: "event-target-shim",
+    expectedVersion: mobilePackage.dependencies?.["event-target-shim"],
+    retryHint: "npm run start:dev-client -w @dominion/mobile"
   }
 ];
 
