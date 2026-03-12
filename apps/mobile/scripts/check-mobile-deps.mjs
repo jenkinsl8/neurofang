@@ -27,9 +27,9 @@ function verifyDependency({ packageName, expectedVersion, retryHint }) {
   try {
     const installedPackageJson = resolvePackageJson(packageName);
     const installedVersion = JSON.parse(readFileSync(installedPackageJson, "utf8")).version;
-    const normalizedExpected = String(expectedVersion).replace(/^[~^]/, "");
+    const normalizedExpected = String(expectedVersion).trim();
 
-    if (installedVersion !== normalizedExpected) {
+    if (!isVersionSatisfied(installedVersion, normalizedExpected)) {
       console.error(`❌ ${packageName} version mismatch in mobile workspace`);
       console.error(`   package.json expects: ${expectedVersion}`);
       console.error(`   node_modules has:    ${installedVersion}`);
@@ -49,6 +49,70 @@ function verifyDependency({ packageName, expectedVersion, retryHint }) {
     console.error(`   Details: ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
+}
+
+function isVersionSatisfied(installedVersion, expectedRange) {
+  const { operator, version } = parseExpectedRange(expectedRange);
+
+  if (operator === "") {
+    return installedVersion === version;
+  }
+
+  const installedParts = parseSemver(installedVersion);
+  const expectedParts = parseSemver(version);
+
+  if (!installedParts || !expectedParts) {
+    return false;
+  }
+
+  if (operator === "~") {
+    return (
+      installedParts.major === expectedParts.major &&
+      installedParts.minor === expectedParts.minor &&
+      compareSemver(installedParts, expectedParts) >= 0
+    );
+  }
+
+  if (operator === "^") {
+    return installedParts.major === expectedParts.major && compareSemver(installedParts, expectedParts) >= 0;
+  }
+
+  return false;
+}
+
+function parseExpectedRange(value) {
+  const firstChar = value.charAt(0);
+  const hasRangeOperator = firstChar === "~" || firstChar === "^";
+
+  return {
+    operator: hasRangeOperator ? firstChar : "",
+    version: hasRangeOperator ? value.slice(1) : value
+  };
+}
+
+function parseSemver(version) {
+  const semverMatch = /^(\d+)\.(\d+)\.(\d+)/.exec(version);
+  if (!semverMatch) {
+    return null;
+  }
+
+  return {
+    major: Number(semverMatch[1]),
+    minor: Number(semverMatch[2]),
+    patch: Number(semverMatch[3])
+  };
+}
+
+function compareSemver(a, b) {
+  if (a.major !== b.major) {
+    return a.major - b.major;
+  }
+
+  if (a.minor !== b.minor) {
+    return a.minor - b.minor;
+  }
+
+  return a.patch - b.patch;
 }
 
 const mobilePackage = JSON.parse(readFileSync(path.join(projectRoot, "package.json"), "utf8"));
