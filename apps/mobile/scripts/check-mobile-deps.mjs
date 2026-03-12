@@ -116,6 +116,23 @@ function compareSemver(a, b) {
 }
 
 const mobilePackage = JSON.parse(readFileSync(path.join(projectRoot, "package.json"), "utf8"));
+const mobileAppConfig = JSON.parse(readFileSync(path.join(projectRoot, "app.json"), "utf8"));
+
+function verifyIosMicrophoneUsageDescription(appConfig) {
+  const usageDescription = appConfig?.expo?.ios?.infoPlist?.NSMicrophoneUsageDescription;
+
+  if (typeof usageDescription !== "string" || usageDescription.trim().length === 0) {
+    console.error("❌ Missing iOS microphone permission usage description");
+    console.error("   apps/mobile/app.json must define expo.ios.infoPlist.NSMicrophoneUsageDescription.");
+    console.error("   Without this key, iOS aborts at runtime when microphone capture starts (TCC privacy crash).");
+    console.error("   Then regenerate native assets with:");
+    console.error("     npm run ios:prebuild -w @dominion/mobile");
+    return false;
+  }
+
+  console.log("✅ iOS microphone usage description is configured");
+  return true;
+}
 
 const checks = [
   {
@@ -136,6 +153,8 @@ const checks = [
 ];
 
 const allGood = checks.every(verifyDependency);
-if (!allGood) {
+const hasMicUsageDescription = verifyIosMicrophoneUsageDescription(mobileAppConfig);
+
+if (!allGood || !hasMicUsageDescription) {
   process.exit(1);
 }
