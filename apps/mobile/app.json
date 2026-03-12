@@ -6,6 +6,11 @@
     "plugins": [
       "expo-dev-client"
     ],
+    "ios": {
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Dominion Mobile uses your microphone to capture your interview responses during live coaching sessions."
+      }
+    },
     "entryPoint": "./index.ts"
   }
 }
