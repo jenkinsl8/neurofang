@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Button, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Constants from 'expo-constants';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { AvatarCatalogEntry, InterviewIntake } from '@dominion/shared';
@@ -61,6 +61,8 @@ function traceWebRtc(event: string, details?: Record<string, unknown>) {
   const timestamp = new Date().toISOString();
   console.debug(`[trace:mobile][webrtc][${timestamp}] ${event}`, details ?? {});
 }
+
+const FALLBACK_THUMBNAIL = 'https://placehold.co/256x256/111826/f5f7fa?text=Avatar';
 
 const defaultIntake: InterviewIntake = {
   company: 'Acme',
@@ -184,12 +186,33 @@ async function exchangeSessionSdp(
 export default function App() {
   const peerRef = useRef<PeerConnection | null>(null);
   const localStreamRef = useRef<RealtimeMediaStream | null>(null);
+  const [intake, setIntake] = useState<InterviewIntake>(defaultIntake);
+  const [avatars, setAvatars] = useState<AvatarCatalogEntry[]>([]);
   const [status, setStatus] = useState('idle');
-  const [avatar, setAvatar] = useState<AvatarCatalogEntry | null>(null);
+  const [avatarId, setAvatarId] = useState<string>('pick-for-me');
   const [error, setError] = useState<string>('');
 
+  const selectedAvatar = useMemo(
+    () => avatars.find((nextAvatar) => nextAvatar.id === avatarId) ?? null,
+    [avatars, avatarId]
+  );
+
   useEffect(() => {
-    void pickDiverseAvatar();
+    void (async () => {
+      try {
+        setError('');
+        const res = await fetch(`${SERVER_URL}/api/avatars`);
+        if (!res.ok) {
+          throw new Error(`Failed to load avatars: ${res.status}`);
+        }
+
+        const data = (await res.json()) as { avatars: AvatarCatalogEntry[] };
+        setAvatars(data.avatars);
+        await pickDiverseAvatar();
+      } catch (nextError) {
+        setError(nextError instanceof Error ? nextError.message : 'Failed to initialize app');
+      }
+    })();
   }, []);
 
   async function pickDiverseAvatar() {
@@ -198,7 +221,7 @@ export default function App() {
       const res = await fetch(`${SERVER_URL}/api/avatars/pick`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ excludeIds: avatar ? [avatar.id] : [] })
+        body: JSON.stringify({ excludeIds: selectedAvatar ? [selectedAvatar.id] : [] })
       });
 
       if (!res.ok) {
@@ -206,7 +229,7 @@ export default function App() {
       }
 
       const data = (await res.json()) as { avatar: AvatarCatalogEntry };
-      setAvatar(data.avatar);
+      setAvatarId(data.avatar.id);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : 'Failed to load avatar');
     }
@@ -216,7 +239,7 @@ export default function App() {
     try {
       setError('');
       setStatus('connecting');
-      traceWebRtc('connect:start', { avatarId: avatar?.id });
+      traceWebRtc('connect:start', { avatarId: selectedAvatar?.id, intake });
       const webRtc = getWebRtcModule();
       if (!webRtc) {
         throw new Error('Expo Go cannot run this project (SDK/native modules mismatch). Build/open the custom development client with `npm run ios -w @dominion/mobile` or `npm run android -w @dominion/mobile`, then start Metro with `npm run start:dev-client -w @dominion/mobile`.');
@@ -242,8 +265,8 @@ export default function App() {
             try {
               await exchangeSessionSdp(peer, {
                 reason: 'ice-restart',
-                avatarId: avatar?.id,
-                intake: defaultIntake
+                avatarId: selectedAvatar?.id,
+                intake
               });
               traceWebRtc('ice:recovery:restart-succeeded');
             } catch (iceRecoveryError) {
@@ -269,8 +292,8 @@ export default function App() {
 
       await exchangeSessionSdp(peer, {
         reason: 'initial',
-        avatarId: avatar?.id,
-        intake: defaultIntake
+        avatarId: selectedAvatar?.id,
+        intake
       });
       setStatus('connected');
       traceWebRtc('connect:completed');
@@ -297,29 +320,230 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#111827', padding: 20 }}>
-      <Text style={{ color: 'white', fontSize: 24, marginBottom: 10 }}>Dominion Mobile MVP</Text>
-      <Text style={{ color: '#cbd5e1', marginBottom: 8 }}>Status: {status}</Text>
+    <SafeAreaView style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.title}>Dominion MVP</Text>
+        <Text style={styles.status}>Status: {status}</Text>
       {IS_EXPO_GO ? (
-        <Text style={{ color: '#fde68a', marginBottom: 8 }}>
+          <Text style={styles.warning}>
           Running in Expo Go: this project uses native modules (react-native-webrtc), so Expo Go from the App Store is unsupported/incompatible. Open the custom development build instead.
         </Text>
       ) : null}
-      {error ? <Text style={{ color: '#fca5a5', marginBottom: 8 }}>{error}</Text> : null}
-      <Text style={{ color: '#cbd5e1', marginBottom: 20 }}>
-        Interviewer: {avatar ? `${avatar.name} (${avatar.gender}, ${avatar.raceGroup})` : 'Loading...'}
-      </Text>
-      <Button title="Pick for me" onPress={() => void pickDiverseAvatar()} />
-      <View style={{ height: 12 }} />
-      <Button title="Connect" onPress={connect} disabled={status !== 'idle'} />
-      <View style={{ height: 12 }} />
-      <Button title="Disconnect" onPress={disconnect} disabled={status === 'idle'} />
-      <View style={{ marginTop: 24, padding: 12, borderColor: '#334155', borderWidth: 1, borderRadius: 8 }}>
-        <Text style={{ color: '#e2e8f0' }}>MakeHuman + Unity interviewer placeholder</Text>
-        <Text style={{ color: '#94a3b8', marginTop: 8 }}>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Interview intake</Text>
+          <Text style={styles.label}>Company</Text>
+          <TextInput value={intake.company} onChangeText={(company) => setIntake({ ...intake, company })} style={styles.input} />
+          <Text style={styles.label}>Job title</Text>
+          <TextInput value={intake.jobTitle} onChangeText={(jobTitle) => setIntake({ ...intake, jobTitle })} style={styles.input} />
+          <ChoiceRow
+            label="Level"
+            options={['junior', 'mid', 'senior', 'staff']}
+            selected={intake.level}
+            onChange={(level) => setIntake({ ...intake, level: level as InterviewIntake['level'] })}
+          />
+          <ChoiceRow
+            label="Difficulty"
+            options={['friendly', 'neutral', 'tough']}
+            selected={intake.difficulty}
+            onChange={(difficulty) => setIntake({ ...intake, difficulty: difficulty as InterviewIntake['difficulty'] })}
+          />
+          <ChoiceRow
+            label="Personality"
+            options={['friendly', 'analytical', 'skeptical', 'executive']}
+            selected={intake.personality}
+            onChange={(personality) =>
+              setIntake({ ...intake, personality: personality as InterviewIntake['personality'] })
+            }
+          />
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>MakeHuman + Unity interviewer picker</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.avatarList}>
+            <AvatarTile
+              title="Pick for me"
+              subtitle="Diversity-aware default"
+              selected={avatarId === 'pick-for-me'}
+              onPress={() => {
+                setAvatarId('pick-for-me');
+                void pickDiverseAvatar();
+              }}
+            />
+            {avatars.map((nextAvatar) => (
+              <AvatarTile
+                key={nextAvatar.id}
+                title={nextAvatar.name}
+                subtitle={`${nextAvatar.gender} · ${nextAvatar.raceGroup}`}
+                selected={avatarId === nextAvatar.id}
+                imageUri={nextAvatar.thumbnailPath ? `${SERVER_URL}${nextAvatar.thumbnailPath}` : FALLBACK_THUMBNAIL}
+                onPress={() => setAvatarId(nextAvatar.id)}
+              />
+            ))}
+          </ScrollView>
+          <Pressable style={styles.primaryButton} onPress={() => void pickDiverseAvatar()}>
+            <Text style={styles.primaryButtonText}>Pick random diverse avatar</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Interview stage</Text>
+          <Text style={styles.meta}>Interviewer: {selectedAvatar?.name ?? 'Loading...'}</Text>
+          {selectedAvatar ? (
+            <Image
+              source={{ uri: selectedAvatar.thumbnailPath ? `${SERVER_URL}${selectedAvatar.thumbnailPath}` : FALLBACK_THUMBNAIL }}
+              style={styles.selectedAvatar}
+            />
+          ) : null}
+          <Pressable style={styles.primaryButton} onPress={connect} disabled={status !== 'idle'}>
+            <Text style={styles.primaryButtonText}>Connect</Text>
+          </Pressable>
+          <View style={styles.gap} />
+          <Pressable style={styles.secondaryButton} onPress={disconnect} disabled={status === 'idle'}>
+            <Text style={styles.secondaryButtonText}>Disconnect</Text>
+          </Pressable>
+          <View style={styles.placeholder}>
+            <Text style={styles.placeholderTitle}>MakeHuman + Unity interviewer placeholder</Text>
+            <Text style={styles.placeholderText}>
           For production mobile rendering, load the selected Unity scene URL in a WebView and send stage-state messages (speech/listening) to drive MakeHuman rig animations.
         </Text>
-      </View>
+          </View>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
+
+function ChoiceRow({
+  label,
+  options,
+  selected,
+  onChange
+}: {
+  label: string;
+  options: string[];
+  selected: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <View style={styles.choiceBlock}>
+      <Text style={styles.label}>{label}</Text>
+      <View style={styles.choiceRow}>
+        {options.map((option) => {
+          const isSelected = option === selected;
+          return (
+            <Pressable
+              key={option}
+              style={[styles.choiceChip, isSelected ? styles.choiceChipSelected : null]}
+              onPress={() => onChange(option)}
+            >
+              <Text style={[styles.choiceChipLabel, isSelected ? styles.choiceChipLabelSelected : null]}>
+                {option}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function AvatarTile({
+  title,
+  subtitle,
+  selected,
+  onPress,
+  imageUri
+}: {
+  title: string;
+  subtitle: string;
+  selected: boolean;
+  onPress: () => void;
+  imageUri?: string;
+}) {
+  return (
+    <Pressable style={[styles.avatarTile, selected ? styles.avatarTileSelected : null]} onPress={onPress}>
+      {imageUri ? <Image source={{ uri: imageUri }} style={styles.avatarThumbnail} /> : null}
+      <Text style={styles.avatarTitle}>{title}</Text>
+      <Text style={styles.avatarSubtitle}>{subtitle}</Text>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: '#10151f' },
+  content: { padding: 20, gap: 16 },
+  title: { color: '#f5f7fa', fontSize: 30, fontWeight: '700' },
+  status: { color: '#cbd5e1' },
+  warning: { color: '#fde68a' },
+  error: { color: '#fca5a5' },
+  card: {
+    backgroundColor: '#182130',
+    borderColor: '#29384c',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    gap: 8
+  },
+  cardTitle: { color: '#f5f7fa', fontSize: 18, fontWeight: '600', marginBottom: 8 },
+  label: { color: '#cbd5e1', fontSize: 14 },
+  input: {
+    borderColor: '#324862',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    color: '#f5f7fa',
+    backgroundColor: '#111826'
+  },
+  choiceBlock: { gap: 8, marginTop: 4 },
+  choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  choiceChip: {
+    borderColor: '#324862',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#111826'
+  },
+  choiceChipSelected: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
+  choiceChipLabel: { color: '#cbd5e1', textTransform: 'capitalize' },
+  choiceChipLabelSelected: { color: '#f5f7fa' },
+  avatarList: { marginBottom: 12 },
+  avatarTile: {
+    width: 136,
+    borderColor: '#2b3f59',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 8,
+    marginRight: 10,
+    backgroundColor: '#111826'
+  },
+  avatarTileSelected: { borderColor: '#60a5fa', borderWidth: 2 },
+  avatarThumbnail: { width: '100%', height: 90, borderRadius: 8, marginBottom: 8 },
+  avatarTitle: { color: '#f5f7fa', fontWeight: '600' },
+  avatarSubtitle: { color: '#9fb1c8', fontSize: 12, marginTop: 4 },
+  selectedAvatar: { width: 120, height: 120, borderRadius: 8, borderColor: '#334a67', borderWidth: 1 },
+  meta: { color: '#cbd5e1' },
+  primaryButton: {
+    backgroundColor: '#2563eb',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center'
+  },
+  primaryButtonText: { color: '#f5f7fa', fontWeight: '600' },
+  secondaryButton: {
+    backgroundColor: '#111826',
+    borderRadius: 8,
+    borderColor: '#324862',
+    borderWidth: 1,
+    paddingVertical: 10,
+    alignItems: 'center'
+  },
+  secondaryButtonText: { color: '#f5f7fa', fontWeight: '600' },
+  gap: { height: 4 },
+  placeholder: { marginTop: 12, borderColor: '#334155', borderWidth: 1, borderRadius: 8, padding: 12, gap: 8 },
+  placeholderTitle: { color: '#e2e8f0' },
+  placeholderText: { color: '#94a3b8' }
+});
