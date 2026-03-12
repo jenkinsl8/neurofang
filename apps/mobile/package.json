@@ -19,6 +19,7 @@
     "@dominion/shared": "0.0.1",
     "expo": "~55.0.0",
     "expo-dev-client": "~6.0.16",
+    "event-target-shim": "^6.0.2",
     "react": "19.2.0",
     "react-native": "0.83.2",
     "react-native-webrtc": "^124.0.4",
